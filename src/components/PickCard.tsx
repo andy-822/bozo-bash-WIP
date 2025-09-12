@@ -1,13 +1,35 @@
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
 import { formatOdds } from '@/lib/data';
 import { Pick } from '@/lib/types';
+import { Database } from '@/lib/database.types';
+
+type DatabasePick = Database['public']['Tables']['picks']['Row'] & {
+  games: Database['public']['Tables']['games']['Row'];
+};
 
 interface PickCardProps {
-  pick: Pick;
+  pick: Pick | DatabasePick;
   showUser?: boolean;
 }
 
 export default function PickCard({ pick, showUser = true }: PickCardProps) {
+  // Check if this is a database pick or legacy mock data pick
+  const isDatabasePick = 'games' in pick && !('game' in pick);
+  
+  // Extract the data in a common format
+  const game = isDatabasePick ? (pick as DatabasePick).games : (pick as Pick).game;
+  const user = isDatabasePick ? null : (pick as Pick).user; // Database picks don't have user data embedded yet
+  
+  // Handle database vs legacy game field differences
+  const awayTeam = isDatabasePick ? (game as any).away_team : (game as any).awayTeam;
+  const homeTeam = isDatabasePick ? (game as any).home_team : (game as any).homeTeam;
+  const gameTime = isDatabasePick ? (game as any).game_time : (game as any).gameTime;
+  
+  // Handle betType difference (bet_type vs betType)
+  const betType = isDatabasePick ? (pick as DatabasePick).bet_type : (pick as Pick).betType;
+  
+  // Handle odds (ensure it's not null)
+  const odds = pick.odds ?? 0;
   const getStatusIcon = () => {
     switch (pick.status) {
       case 'won':
@@ -30,7 +52,8 @@ export default function PickCard({ pick, showUser = true }: PickCardProps) {
     }
   };
 
-  const formatGameTime = (date: Date) => {
+  const formatGameTime = (date: Date | string) => {
+    const gameTime = typeof date === 'string' ? new Date(date) : date;
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       month: 'short',
@@ -38,26 +61,26 @@ export default function PickCard({ pick, showUser = true }: PickCardProps) {
       hour: 'numeric',
       minute: '2-digit',
       timeZoneName: 'short'
-    }).format(date);
+    }).format(gameTime);
   };
 
   return (
     <div className="bg-slate-800 rounded-lg p-4 card-hover border border-slate-600">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          {showUser && (
+          {showUser && user && (
             <div className="flex items-center mb-2">
-              <span className="text-lg mr-2">{pick.user.avatar}</span>
-              <span className="text-sm font-medium text-gray-200">{pick.user.name}</span>
+              <span className="text-lg mr-2">{user.avatar}</span>
+              <span className="text-sm font-medium text-gray-200">{user.name}</span>
             </div>
           )}
           
           <div className="space-y-1">
             <h3 className="font-semibold text-white">
-              {pick.game.awayTeam} @ {pick.game.homeTeam}
+              {awayTeam} @ {homeTeam}
             </h3>
             <p className="text-sm text-gray-400">
-              {formatGameTime(pick.game.gameTime)}
+              {formatGameTime(gameTime)}
             </p>
           </div>
         </div>
@@ -74,17 +97,17 @@ export default function PickCard({ pick, showUser = true }: PickCardProps) {
         <div className="flex-1">
           <p className="text-lg font-bold text-white">{pick.selection}</p>
           <p className="text-sm text-gray-400 capitalize">
-            {pick.betType === 'moneyline' ? 'Money Line' : pick.betType}
+            {betType === 'moneyline' ? 'Money Line' : betType}
           </p>
         </div>
         
         <div className="text-right">
           <p className={`text-lg font-bold ${
-            pick.odds > 0 ? 'text-green-400' : 'text-gray-200'
+            odds > 0 ? 'text-green-400' : 'text-gray-200'
           }`}>
-            {formatOdds(pick.odds)}
+            {formatOdds(odds)}
           </p>
-          <p className="text-xs text-gray-500">{pick.game.sport}</p>
+          <p className="text-xs text-gray-500">NFL</p>
         </div>
       </div>
 
@@ -95,7 +118,7 @@ export default function PickCard({ pick, showUser = true }: PickCardProps) {
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit'
-          }).format(pick.submittedAt)}
+          }).format(isDatabasePick ? new Date(pick.created_at!) : (pick as Pick).submittedAt)}
         </p>
       </div>
     </div>

@@ -6,19 +6,69 @@ import Header from '@/components/ui/Header';
 import StatsCard from '@/components/ui/StatsCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import PickCard from '@/components/PickCard';
-import { picks, weekStats, userStats, formatCurrency, calculatePotentialWinnings } from '@/lib/data';
+import AppWrapper from '@/components/AppWrapper';
+import { formatCurrency } from '@/lib/data';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { useLeague } from '@/contexts/LeagueContext';
+import LeagueSelection from '@/components/LeagueSelection';
 
 export default function Dashboard() {
-  const currentWeekPicks = picks.filter(pick => pick.week === 15 && pick.season === 2024);
-  const totalUsers = userStats.length;
-  const totalSeason = userStats.reduce((sum, user) => sum + user.totalParlays, 0);
-  const totalWins = userStats.reduce((sum, user) => sum + user.wins, 0);
-  const totalWinnings = userStats.reduce((sum, user) => sum + user.totalWinnings, 0);
-  const overallHitRate = totalSeason > 0 ? (totalWins / totalSeason) * 100 : 0;
+  const { currentLeague, currentSeason } = useLeague();
+  const {
+    currentWeekPicks,
+    totalUsers,
+    totalSeason,
+    totalWins,
+    overallHitRate,
+    submittedPicks,
+    totalPicks,
+    loading
+  } = useDashboardData();
+
+  // For now, use placeholder for total winnings since we don't track this yet
+  const totalWinnings = 0;
+
+  if (loading) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-400">Loading dashboard...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
+
+  if (!currentLeague || !currentSeason) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-8 text-center">
+              <h1 className="text-3xl font-bold text-white mb-2">Welcome to Bozos Parlay Challenge</h1>
+              <p className="text-gray-400">
+                Select a league to get started or create a new one.
+              </p>
+            </div>
+            <LeagueSelection />
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <Header />
+    <AppWrapper>
+      <div className="min-h-screen bg-slate-900">
+        <Header />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Top Stats */}
@@ -58,13 +108,13 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Week 15 Progress</h2>
             <div className="text-sm text-gray-400">
-              Potential Winnings: {formatCurrency(calculatePotentialWinnings(currentWeekPicks, 10))}
+              {currentSeason?.name || 'No Season Selected'}
             </div>
           </div>
           
           <ProgressBar
-            current={weekStats.submittedPicks}
-            total={weekStats.totalPicks}
+            current={submittedPicks}
+            total={totalPicks}
             label="Picks Submitted"
             color="blue"
             size="md"
@@ -72,7 +122,7 @@ export default function Dashboard() {
           
           <div className="mt-4 text-center">
             <p className="text-gray-400 text-sm">
-              {weekStats.submittedPicks} of {weekStats.totalPicks} players have submitted their picks
+              {submittedPicks} of {totalPicks} players have submitted their picks
             </p>
           </div>
         </div>
@@ -149,6 +199,7 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
-    </div>
+      </div>
+    </AppWrapper>
   );
 }

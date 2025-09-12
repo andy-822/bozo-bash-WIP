@@ -5,11 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Send, Calculator, ArrowLeft, Gamepad2 } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
-import { games, users, formatOdds, calculatePotentialWinnings } from '@/lib/data';
+import AppWrapper from '@/components/AppWrapper';
+import { useUser } from '@/contexts/UserContext';
+import { useLeague } from '@/contexts/LeagueContext';
+import { useGames } from '@/hooks/useGames';
+import { formatOdds } from '@/lib/data';
 import { BetType } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
 interface PickFormData {
-  userName: string;
   gameId: string;
   betType: BetType;
   selection: string;
@@ -18,8 +22,10 @@ interface PickFormData {
 
 export default function SubmitPick() {
   const router = useRouter();
+  const { currentUser } = useUser();
+  const { currentLeague, currentSeason } = useLeague();
+  const { games, loading: gamesLoading, error: gamesError } = useGames();
   const [formData, setFormData] = useState<PickFormData>({
-    userName: '',
     gameId: '',
     betType: 'moneyline',
     selection: '',
@@ -27,13 +33,11 @@ export default function SubmitPick() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<PickFormData>>({});
+  const [submitError, setSubmitError] = useState('');
 
   const validateForm = (): boolean => {
     const newErrors: Partial<PickFormData> = {};
 
-    if (!formData.userName.trim()) {
-      newErrors.userName = 'Name is required';
-    }
     if (!formData.gameId) {
       newErrors.gameId = 'Please select a game';
     }
@@ -57,16 +61,36 @@ export default function SubmitPick() {
     e.preventDefault();
     
     if (!validateForm()) return;
+    if (!currentUser || !currentSeason) return;
 
     setIsSubmitting(true);
+    setSubmitError('');
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // In a real app, you'd submit to your backend here
-    console.log('Submitting pick:', formData);
-    
-    router.push('/?submitted=true');
+    try {
+      const { data, error } = await supabase
+        .from('picks')
+        .insert({
+          user_id: currentUser.id,
+          season_id: currentSeason.id,
+          game_id: formData.gameId,
+          bet_type: formData.betType,
+          selection: formData.selection,
+          odds: parseFloat(formData.odds),
+          week: 15, // For now, hardcoded to week 15
+          status: 'pending'
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      router.push('/?submitted=true');
+    } catch (error) {
+      console.error('Error submitting pick:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit pick');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: keyof PickFormData, value: string) => {
@@ -79,46 +103,102 @@ export default function SubmitPick() {
 
   const selectedGame = games.find(game => game.id === formData.gameId);
   const oddsNumber = parseFloat(formData.odds) || 0;
-  const potentialWinnings = oddsNumber !== 0 ? calculatePotentialWinnings([{
-    id: 'temp',
-    userId: 'temp',
-    user: users[0],
-    gameId: formData.gameId,
-    game: selectedGame!,
-    betType: formData.betType,
-    odds: oddsNumber,
-    selection: formData.selection,
-    status: 'pending',
-    submittedAt: new Date(),
-    week: 15,
-    season: 2024,
-  }], 10) : 0;
+  
+  // Simple potential winnings calculation for American odds
+  const calculateWinnings = (odds: number, betAmount: number = 10): number => {
+    if (odds === 0) return 0;
+    if (odds > 0) {
+      return betAmount * (odds / 100);
+    } else {
+      return betAmount * (100 / Math.abs(odds));
+    }
+  };
+  
+  const potentialWinnings = calculateWinnings(oddsNumber, 10);
 
   const getBetTypeOptions = () => {
     switch (formData.betType) {
       case 'spread':
         return selectedGame ? [
-          `${selectedGame.homeTeam} -3.5`,
-          `${selectedGame.awayTeam} +3.5`,
-          `${selectedGame.homeTeam} -7.5`,
-          `${selectedGame.awayTeam} +7.5`,
+          `${selectedGame.home_team} -3.5`,
+          `${selectedGame.away_team} +3.5`,
+          `${selectedGame.home_team} -7.5`,
+          `${selectedGame.away_team} +7.5`,
         ] : [];
       case 'over':
       case 'under':
         return ['Over 47.5', 'Under 47.5', 'Over 52.5', 'Under 52.5'];
       case 'moneyline':
         return selectedGame ? [
-          `${selectedGame.homeTeam} ML`,
-          `${selectedGame.awayTeam} ML`,
+          `${selectedGame.home_team} ML`,
+          `${selectedGame.away_team} ML`,
         ] : [];
       default:
         return [];
     }
   };
 
+  // Loading and error states
+  if (gamesLoading) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-400">Loading games...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
+
+  if (!currentLeague || !currentSeason) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-white mb-4">No League Selected</h2>
+              <p className="text-gray-400 mb-6">Please select a league to submit picks.</p>
+              <Link href="/leagues">
+                <button className="btn-primary">Manage Leagues</button>
+              </Link>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
+
+  if (gamesError) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-white mb-4">Error Loading Games</h2>
+              <p className="text-gray-400 mb-6">{gamesError}</p>
+              <button onClick={() => window.location.reload()} className="btn-primary">
+                Retry
+              </button>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-900">
-      <Header />
+    <AppWrapper>
+      <div className="min-h-screen bg-slate-900">
+        <Header />
       
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -137,21 +217,27 @@ export default function SubmitPick() {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="bg-slate-800 rounded-lg p-6 border border-slate-600">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* User Name */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    className={`input-dark w-full ${errors.userName ? 'border-red-danger' : ''}`}
-                    placeholder="Enter your name"
-                    value={formData.userName}
-                    onChange={(e) => handleInputChange('userName', e.target.value)}
-                  />
-                  {errors.userName && (
-                    <p className="text-red-400 text-sm mt-1">{errors.userName}</p>
-                  )}
+                {/* Current User Display */}
+                <div className="md:col-span-2 mb-4 p-4 bg-slate-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    {currentUser?.user_metadata?.avatar_url ? (
+                      <img 
+                        src={currentUser.user_metadata.avatar_url} 
+                        alt="Profile" 
+                        className="w-10 h-10 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-lg">
+                        {currentUser?.user_metadata?.full_name?.[0] || currentUser?.email?.[0] || 'U'}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white font-medium">
+                        Submitting as: {currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0]}
+                      </p>
+                      <p className="text-gray-400 text-sm">Week 15 • {currentSeason?.name}</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Game Selection */}
@@ -167,13 +253,13 @@ export default function SubmitPick() {
                     <option value="">Choose a game...</option>
                     {games.map(game => (
                       <option key={game.id} value={game.id}>
-                        {game.awayTeam} @ {game.homeTeam} - {new Intl.DateTimeFormat('en-US', {
+                        {game.away_team} @ {game.home_team} - {new Intl.DateTimeFormat('en-US', {
                           weekday: 'short',
                           month: 'short',
                           day: 'numeric',
                           hour: 'numeric',
                           minute: '2-digit'
-                        }).format(game.gameTime)}
+                        }).format(new Date(game.game_time))}
                       </option>
                     ))}
                   </select>
@@ -250,6 +336,12 @@ export default function SubmitPick() {
                 </div>
               </div>
 
+              {submitError && (
+                <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
+                  <p className="text-red-400">{submitError}</p>
+                </div>
+              )}
+
               {/* Submit Button */}
               <div className="mt-8 flex justify-end">
                 <button
@@ -289,7 +381,7 @@ export default function SubmitPick() {
                   <div>
                     <p className="text-sm text-gray-400">Game</p>
                     <p className="text-white font-medium">
-                      {selectedGame.awayTeam} @ {selectedGame.homeTeam}
+                      {selectedGame.away_team} @ {selectedGame.home_team}
                     </p>
                   </div>
 
@@ -342,6 +434,7 @@ export default function SubmitPick() {
           </div>
         </div>
       </main>
-    </div>
+      </div>
+    </AppWrapper>
   );
 }

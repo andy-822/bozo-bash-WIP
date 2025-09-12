@@ -4,16 +4,22 @@ import { Trophy, TrendingUp, TrendingDown, Minus, Crown, Flame, Zap } from 'luci
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import ProgressBar from '@/components/ui/ProgressBar';
-import { userStats, formatCurrency } from '@/lib/data';
+import AppWrapper from '@/components/AppWrapper';
+import { formatCurrency } from '@/lib/data';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { useLeague } from '@/contexts/LeagueContext';
 
 export default function Leaderboard() {
+  const { currentLeague, currentSeason } = useLeague();
+  const { userStats, totalPicks, totalWins, overallWinRate, loading } = useLeaderboard();
+  
   const sortedUsers = [...userStats].sort((a, b) => {
     // Primary sort by win rate
     if (b.winRate !== a.winRate) {
       return b.winRate - a.winRate;
     }
-    // Secondary sort by total winnings
-    return b.totalWinnings - a.totalWinnings;
+    // Secondary sort by total picks (experience)
+    return b.totalPicks - a.totalPicks;
   });
 
   const getPerformanceIcon = (winRate: number, currentStreak: number, streakType: 'win' | 'loss') => {
@@ -64,14 +70,50 @@ export default function Leaderboard() {
     }
   };
 
-  const totalParlays = userStats.reduce((sum, user) => sum + user.totalParlays, 0);
-  const totalWins = userStats.reduce((sum, user) => sum + user.wins, 0);
-  const totalWinnings = userStats.reduce((sum, user) => sum + user.totalWinnings, 0);
-  const overallWinRate = totalParlays > 0 ? (totalWins / totalParlays) * 100 : 0;
+  // For now, we don't track total winnings, so set to 0
+  const totalWinnings = 0;
+
+  if (loading) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-400">Loading leaderboard...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
+
+  if (!currentLeague || !currentSeason) {
+    return (
+      <AppWrapper>
+        <div className="min-h-screen bg-slate-900">
+          <Header />
+          <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-white mb-4">No League Selected</h2>
+              <p className="text-gray-400 mb-6">Please select a league to view the leaderboard.</p>
+              <Link href="/leagues">
+                <button className="btn-primary">Manage Leagues</button>
+              </Link>
+            </div>
+          </main>
+        </div>
+      </AppWrapper>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <Header />
+    <AppWrapper>
+      <div className="min-h-screen bg-slate-900">
+        <Header />
       
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -80,7 +122,7 @@ export default function Leaderboard() {
             Season Leaderboard
           </h1>
           <p className="text-gray-400">
-            Rankings based on win rate and total winnings for the 2024 season.
+            Rankings based on win rate and total picks for {currentSeason?.name}.
           </p>
         </div>
 
@@ -89,8 +131,8 @@ export default function Leaderboard() {
           <h2 className="text-xl font-bold text-white mb-6">Season Summary</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-500">{totalParlays}</p>
-              <p className="text-sm text-gray-400">Total Parlays</p>
+              <p className="text-3xl font-bold text-blue-500">{totalPicks}</p>
+              <p className="text-sm text-gray-400">Total Picks</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-green-400">{totalWins}</p>
@@ -135,13 +177,15 @@ export default function Leaderboard() {
                       {/* User Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3 mb-2">
-                          <span className="text-2xl">{user.user.avatar}</span>
+                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                            {user.user_name[0]?.toUpperCase() || 'U'}
+                          </div>
                           <div>
                             <h3 className="text-lg font-semibold text-white">
-                              {user.user.name}
+                              {user.user_name}
                             </h3>
                             <p className="text-sm text-gray-400">
-                              {user.wins}W - {user.losses}L ({user.totalParlays} total)
+                              {user.wins}W - {user.losses}L ({user.totalPicks} total)
                             </p>
                           </div>
                         </div>
@@ -149,7 +193,7 @@ export default function Leaderboard() {
                         {/* Progress Bar */}
                         <ProgressBar
                           current={user.wins}
-                          total={user.totalParlays}
+                          total={user.totalPicks}
                           showNumbers={false}
                           color={user.winRate >= 50 ? 'green' : user.winRate >= 40 ? 'yellow' : 'red'}
                           size="sm"
@@ -166,12 +210,12 @@ export default function Leaderboard() {
                           <p className="text-xs text-gray-500">Win Rate</p>
                         </div>
 
-                        {/* Total Winnings */}
+                        {/* Total Picks */}
                         <div>
-                          <p className="text-xl font-bold text-green-400">
-                            {formatCurrency(user.totalWinnings)}
+                          <p className="text-xl font-bold text-blue-400">
+                            {user.totalPicks}
                           </p>
-                          <p className="text-xs text-gray-500">Winnings</p>
+                          <p className="text-xs text-gray-500">Total Picks</p>
                         </div>
 
                         {/* Current Streak */}
@@ -215,8 +259,10 @@ export default function Leaderboard() {
                 .map(user => (
                   <div key={user.userId} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm">{user.user.avatar}</span>
-                      <span className="text-white text-sm font-medium">{user.user.name}</span>
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-xs">
+                        {user.user_name[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <span className="text-white text-sm font-medium">{user.user_name}</span>
                     </div>
                     <span className="text-orange-500 font-bold">
                       {getStreakText(user.currentStreak, user.streakType)}
@@ -239,8 +285,10 @@ export default function Leaderboard() {
                 .map(user => (
                   <div key={user.userId} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm">{user.user.avatar}</span>
-                      <span className="text-white text-sm font-medium">{user.user.name}</span>
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-xs">
+                        {user.user_name[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <span className="text-white text-sm font-medium">{user.user_name}</span>
                     </div>
                     <span className="text-blue-300 font-bold">
                       {getStreakText(user.currentStreak, user.streakType)}
@@ -250,24 +298,26 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          {/* Biggest Winners */}
+          {/* Most Active */}
           <div className="bg-slate-800 rounded-lg p-6 border border-slate-600">
             <div className="flex items-center mb-4">
               <TrendingUp className="h-5 w-5 text-green-400 mr-2" />
-              <h3 className="text-lg font-semibold text-white">💰 Top Earners</h3>
+              <h3 className="text-lg font-semibold text-white">🎯 Most Active</h3>
             </div>
             <div className="space-y-3">
               {[...sortedUsers]
-                .sort((a, b) => b.totalWinnings - a.totalWinnings)
+                .sort((a, b) => b.totalPicks - a.totalPicks)
                 .slice(0, 3)
                 .map(user => (
                   <div key={user.userId} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm">{user.user.avatar}</span>
-                      <span className="text-white text-sm font-medium">{user.user.name}</span>
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-xs">
+                        {user.user_name[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <span className="text-white text-sm font-medium">{user.user_name}</span>
                     </div>
                     <span className="text-green-400 font-bold">
-                      {formatCurrency(user.totalWinnings)}
+                      {user.totalPicks} picks
                     </span>
                   </div>
                 ))}
@@ -288,6 +338,7 @@ export default function Leaderboard() {
           </Link>
         </div>
       </main>
-    </div>
+      </div>
+    </AppWrapper>
   );
 }
