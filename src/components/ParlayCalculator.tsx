@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Calculator, Plus, X, DollarSign } from 'lucide-react';
 import { calculateParlayOdds, formatOdds, formatCurrency } from '@/lib/data';
 
@@ -40,8 +40,19 @@ export default function ParlayCalculator({ initialLegs = [], className = '' }: P
   };
 
   const parlayOdds = legs.length > 0 ? calculateParlayOdds(legs.map(leg => ({ 
-    odds: leg.odds 
-  } as any))) : 1;
+    id: '',
+    userId: '',
+    user: { id: '', name: '', avatar: '' },
+    gameId: '',
+    game: { id: '', homeTeam: '', awayTeam: '', gameTime: new Date(), sport: 'NFL' as const, week: 0, season: 0 },
+    betType: 'moneyline' as const,
+    odds: leg.odds,
+    selection: '',
+    status: 'pending' as const,
+    submittedAt: new Date(),
+    week: 0,
+    season: 0
+  }))) : 1;
   
   const potentialPayout = (parlayOdds - 1) * betAmount;
   const totalPayout = parlayOdds * betAmount;

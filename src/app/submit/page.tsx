@@ -335,7 +335,7 @@ export default function SubmitPick() {
                 <li>• Check injury reports before making your pick</li>
                 <li>• Weather can impact outdoor games significantly</li>
                 <li>• Look for line movement throughout the week</li>
-                <li>• Don't chase losses with bigger bets</li>
+                <li>• Don&apos;t chase losses with bigger bets</li>
                 <li>• Trust your analysis, not your heart</li>
               </ul>
             </div>

@@ -1,5 +1,6 @@
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
-import { Pick, formatOdds } from '@/lib/data';
+import { formatOdds } from '@/lib/data';
+import { Pick } from '@/lib/types';
 
 interface PickCardProps {
   pick: Pick;

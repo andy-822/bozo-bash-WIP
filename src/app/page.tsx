@@ -115,7 +115,7 @@ export default function Dashboard() {
                 <h3 className="text-lg font-bold">Submit Your Pick</h3>
               </div>
               <p className="text-blue-100 mb-4 text-sm">
-                Got a hot take for this week? Submit your parlay and show the bozos how it's done!
+                Got a hot take for this week? Submit your parlay and show the bozos how it&apos;s done!
               </p>
               <Link href="/submit">
                 <button className="w-full bg-white text-blue-500 font-semibold py-3 px-6 rounded-lg hover:bg-gray-100 transition-colors">
