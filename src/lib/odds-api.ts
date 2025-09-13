@@ -42,7 +42,7 @@ class OddsAPIService {
     }
   }
 
-  // Track API usage in database
+  // Track API usage in console (database table not created yet)
   private async logRequest(
     endpoint: string, 
     sport: string, 
@@ -51,38 +51,24 @@ class OddsAPIService {
     success: boolean = true, 
     error?: string
   ) {
-    try {
-      await supabase.from('odds_api_requests').insert({
-        endpoint,
-        sport,
-        markets: markets.join(','),
-        requests_used: usage.requests_used,
-        requests_remaining: usage.requests_remaining,
-        success,
-        error_message: error
-      });
-    } catch (err) {
-      console.error('Failed to log API request:', err);
-    }
+    console.log('API Request:', {
+      endpoint,
+      sport,
+      markets: markets.join(','),
+      requests_used: usage.requests_used,
+      requests_remaining: usage.requests_remaining,
+      success,
+      error_message: error,
+      timestamp: new Date().toISOString()
+    });
   }
 
-  // Get current month's usage from database
+  // Get current month's usage (simplified for now)
   async getCurrentMonthUsage(): Promise<number> {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const { data, error } = await supabase
-      .from('odds_api_requests')
-      .select('requests_used')
-      .gte('created_at', startOfMonth.toISOString());
-
-    if (error) {
-      console.error('Error fetching usage:', error);
-      return 0;
-    }
-
-    return data?.reduce((total, req) => total + req.requests_used, 0) || 0;
+    // For now, return 0 since we don't have usage tracking table
+    // In production, you'd want to create the odds_api_requests table
+    console.log('Usage tracking not implemented yet');
+    return 0;
   }
 
   // Check if we should make a request based on usage limits
