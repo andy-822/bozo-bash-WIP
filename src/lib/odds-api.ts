@@ -245,15 +245,26 @@ class OddsAPIService {
       if (gameError || !dbGame) {
         console.log(`No matching game found for ${game.away_team} @ ${game.home_team}, creating new game...`);
         
-        // Get the active season (you might want to make this more robust)
-        const { data: activeSeason } = await supabase
+        // Get the active season - with detailed logging
+        console.log('Querying for active season...');
+        
+        // First, let's see all seasons
+        const { data: allSeasons, error: allSeasonsError } = await supabase
           .from('seasons')
-          .select('id')
+          .select('*');
+        console.log('All seasons in database:', { allSeasons, error: allSeasonsError });
+        
+        // Now try to get active season
+        const { data: activeSeason, error: seasonError } = await supabase
+          .from('seasons')
+          .select('id, name, is_active')
           .eq('is_active', true)
           .single();
           
-        if (!activeSeason) {
-          console.error('No active season found, skipping game creation');
+        console.log('Active season query result:', { activeSeason, error: seasonError });
+          
+        if (seasonError || !activeSeason) {
+          console.error('No active season found, skipping game creation. Error:', seasonError);
           continue;
         }
         
