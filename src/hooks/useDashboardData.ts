@@ -38,8 +38,11 @@ export function useDashboardData(): DashboardData {
     if (!currentLeague || !currentSeason) return;
 
     try {
-      // Get current week (for now, use week 15 as example)
-      const currentWeek = 15;
+      // Calculate current week based on season start date
+      const seasonStart = new Date(currentSeason.start_date || '2025-09-04');
+      const now = new Date();
+      const weeksSinceStart = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+      const currentWeek = Math.max(1, Math.min(weeksSinceStart, 18)); // NFL has ~18 weeks
 
       // Get current week picks with game details
       const { data: picksData, error: picksError } = await supabase

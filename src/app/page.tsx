@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useUser } from '@/contexts/UserContext';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useGamesWithOdds } from '@/hooks/useGamesWithOdds';
+import { formatGameData, GameData } from '@/lib/formatGameData';
 import AppWrapper from '@/components/AppWrapper';
 import LeagueSelection from '@/components/LeagueSelection';
 import Header from '@/components/ui/Header';
@@ -23,89 +25,23 @@ export default function Dashboard() {
     refreshData
   } = useDashboardData();
 
+  const { 
+    games: gamesWithOdds, 
+    loading: gamesLoading, 
+    error: gamesError 
+  } = useGamesWithOdds();
+
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
   const [selectedBetType, setSelectedBetType] = useState('moneyline');
   const [selectedBet, setSelectedBet] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
-  // Mock games data - in the future this would come from your database
-  const mockGames = [
-    {
-      id: '1',
-      time: 'Sun, Dec 15 • 1:20 PM MST',
-      awayTeam: 'Buffalo Bills',
-      awayLogo: 'BUF',
-      homeTeam: 'Kansas City Chiefs',
-      homeLogo: 'KC',
-      spread: 'KC -2.5',
-      total: 'O/U 54.5',
-      moneyline: 'BUF +120',
-      hasPick: true
-    },
-    {
-      id: '2',
-      time: 'Sun, Dec 15 • 1:00 PM EST',
-      awayTeam: 'N.Y. Jets',
-      awayLogo: 'NYJ',
-      homeTeam: 'Miami Dolphins',
-      homeLogo: 'MIA',
-      spread: 'MIA -6.5',
-      total: 'O/U 44.5',
-      moneyline: 'NYJ +240',
-      hasPick: false
-    },
-    {
-      id: '3',
-      time: 'Sun, Dec 15 • 1:00 PM EST',
-      awayTeam: 'Tennessee Titans',
-      awayLogo: 'TEN',
-      homeTeam: 'Cincinnati Bengals',
-      homeLogo: 'CIN',
-      spread: 'CIN -7.5',
-      total: 'O/U 47.5',
-      moneyline: 'TEN +280',
-      hasPick: false
-    },
-    {
-      id: '4',
-      time: 'Sun, Dec 15 • 4:05 PM EST',
-      awayTeam: 'Baltimore Ravens',
-      awayLogo: 'BAL',
-      homeTeam: 'N.Y. Giants',
-      homeLogo: 'NYG',
-      spread: 'BAL -15.5',
-      total: 'O/U 43.5',
-      moneyline: 'BAL -1200',
-      hasPick: false
-    },
-    {
-      id: '5',
-      time: 'Sun, Dec 15 • 4:25 PM EST',
-      awayTeam: 'L.A. Rams',
-      awayLogo: 'LAR',
-      homeTeam: 'San Francisco 49ers',
-      homeLogo: 'SF',
-      spread: 'SF -2.5',
-      total: 'O/U 49.5',
-      moneyline: 'LAR +110',
-      hasPick: false
-    }
-  ];
+  // Convert real games with odds to UI format
+  const games = gamesWithOdds.map(formatGameData);
 
 
-interface GameData {
-  id: string;
-  time: string;
-  awayTeam: string;
-  awayLogo: string;
-  homeTeam: string;
-  homeLogo: string;
-  spread: string;
-  total: string;
-  moneyline: string;
-  hasPick: boolean;
-}
+// GameData interface moved to formatGameData.ts
 
   const handleGameSelect = (game: GameData) => {
     setSelectedGame(game);
@@ -266,12 +202,19 @@ interface GameData {
           {/* Games Sidebar */}
           <div className="w-96 bg-slate-800 border-r border-slate-700 h-[calc(100vh-64px)] overflow-y-auto">
             <div className="p-5 border-b border-slate-700 bg-slate-900">
-              <div className="text-white font-semibold mb-1">Week 15 Games</div>
-              <div className="text-gray-400 text-sm">December 15, 2024 • {mockGames.length} games</div>
+              <div className="text-white font-semibold mb-1">Upcoming Games</div>
+              <div className="text-gray-400 text-sm">{games.length} upcoming games</div>
             </div>
             
             <div className="p-4 space-y-3">
-              {mockGames.map((game) => (
+              {gamesLoading ? (
+                <div className="text-center text-gray-400 py-8">Loading games...</div>
+              ) : gamesError ? (
+                <div className="text-center text-red-400 py-8">Error: {gamesError}</div>
+              ) : games.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">No upcoming games found</div>
+              ) : (
+                games.map((game) => (
                 <div
                   key={game.id}
                   onClick={() => handleGameSelect(game)}
@@ -316,7 +259,8 @@ interface GameData {
                     </div>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
