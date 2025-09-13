@@ -31,7 +31,7 @@ export function useDashboardData(): DashboardData {
     loading: true
   });
 
-  // delete me
+  // delete mex
 
   const loadDashboardData = async () => {
     if (!currentLeague || !currentSeason) return;
