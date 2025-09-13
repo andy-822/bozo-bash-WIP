@@ -37,7 +37,15 @@ export function LeagueProvider({ children }: LeagueProviderProps) {
 
   useEffect(() => {
     if (currentUser) {
+      console.log('Current user changed, loading leagues:', currentUser.id);
       loadUserLeagues();
+    } else {
+      console.log('No current user, setting loading to false');
+      setLoading(false);
+      setUserLeagues([]);
+      setCurrentLeagueState(null);
+      setCurrentSeasonState(null);
+      setAvailableSeasons([]);
     }
   }, [currentUser]);
 
@@ -48,9 +56,21 @@ export function LeagueProvider({ children }: LeagueProviderProps) {
   }, [currentLeague]);
 
   const loadUserLeagues = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
+    console.log('Loading leagues for user:', currentUser.id);
     setLoading(true);
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('League loading timeout after 10 seconds');
+      setLoading(false);
+      setUserLeagues([]);
+    }, 10000);
+    
     try {
       // Get user's league memberships with league details
       const { data, error } = await supabase
@@ -62,15 +82,25 @@ export function LeagueProvider({ children }: LeagueProviderProps) {
         `)
         .eq('user_id', currentUser.id);
 
-      if (error) throw error;
+      console.log('League memberships query result:', { data, error });
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       const leagues = data?.map(item => (item as any).leagues).filter(Boolean) as League[];
-      setUserLeagues(leagues);
+      console.log('Processed leagues:', leagues);
+      setUserLeagues(leagues || []);
 
       // Don't automatically select a league - let user choose
     } catch (error) {
       console.error('Error loading user leagues:', error);
+      // Set empty leagues on error to prevent infinite loading
+      setUserLeagues([]);
     } finally {
+      clearTimeout(timeoutId);
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
