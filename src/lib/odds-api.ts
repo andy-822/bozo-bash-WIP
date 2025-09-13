@@ -34,10 +34,12 @@ interface RequestUsage {
 class OddsAPIService {
   private apiKey: string;
   private baseUrl = 'https://api.the-odds-api.com/v4';
+  private useMockData: boolean;
   
   constructor() {
     this.apiKey = process.env.ODDS_API_KEY || '';
-    if (!this.apiKey) {
+    this.useMockData = process.env.USE_MOCK_ODDS === 'true';
+    if (!this.apiKey && !this.useMockData) {
       console.warn('ODDS_API_KEY not found in environment variables');
     }
   }
@@ -96,6 +98,67 @@ class OddsAPIService {
 
   // Fetch odds for NFL games
   async fetchNFLOdds(markets: string[] = ['h2h', 'spreads', 'totals']): Promise<OddsAPIResponse[]> {
+    if (this.useMockData) {
+      console.log('Using mock odds data');
+      const mockData = [
+        {
+          "id": "mock123",
+          "sport_key": "americanfootball_nfl",
+          "sport_title": "NFL",
+          "commence_time": "2024-12-15T20:20:00Z",
+          "home_team": "Kansas City Chiefs",
+          "away_team": "Buffalo Bills",
+          "bookmakers": [
+            {
+              "key": "draftkings",
+              "title": "DraftKings",
+              "last_update": "2024-12-13T17:00:00Z",
+              "markets": [
+                {
+                  "key": "h2h",
+                  "last_update": "2024-12-13T17:00:00Z",
+                  "outcomes": [
+                    {"name": "Kansas City Chiefs", "price": -150},
+                    {"name": "Buffalo Bills", "price": 130}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mock456",
+          "sport_key": "americanfootball_nfl", 
+          "sport_title": "NFL",
+          "commence_time": "2024-12-15T17:00:00Z",
+          "home_team": "Dallas Cowboys",
+          "away_team": "Philadelphia Eagles",
+          "bookmakers": [
+            {
+              "key": "fanduel",
+              "title": "FanDuel", 
+              "last_update": "2024-12-13T17:00:00Z",
+              "markets": [
+                {
+                  "key": "h2h",
+                  "last_update": "2024-12-13T17:00:00Z",
+                  "outcomes": [
+                    {"name": "Dallas Cowboys", "price": 110},
+                    {"name": "Philadelphia Eagles", "price": -130}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ];
+      
+      // Log mock request (with 0 API usage)
+      await this.logRequest('mock-endpoint', 'americanfootball_nfl', markets, { requests_used: 0, requests_remaining: 500 }, true);
+      
+      return mockData as OddsAPIResponse[];
+    }
+
     if (!this.apiKey) {
       throw new Error('Odds API key not configured');
     }
@@ -146,6 +209,15 @@ class OddsAPIService {
 
   // Store odds data in our database
   async storeOddsData(oddsData: OddsAPIResponse[]): Promise<void> {
+    console.log('Processing odds for games:', oddsData.map(g => `${g.away_team} @ ${g.home_team}`));
+    
+    // Get all games in database for comparison
+    const { data: allGames } = await supabase
+      .from('games')
+      .select('id, home_team, away_team');
+    
+    console.log('Database games:', allGames?.map(g => `${g.away_team} @ ${g.home_team}`));
+    
     for (const game of oddsData) {
       // Find matching game in our database by team names and date
       const { data: dbGame, error: gameError } = await supabase
