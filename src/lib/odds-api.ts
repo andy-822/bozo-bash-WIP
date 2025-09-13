@@ -39,6 +39,11 @@ class OddsAPIService {
   constructor() {
     this.apiKey = process.env.ODDS_API_KEY || '';
     this.useMockData = process.env.USE_MOCK_ODDS === 'true';
+    console.log('Environment check:', {
+      USE_MOCK_ODDS: process.env.USE_MOCK_ODDS,
+      useMockData: this.useMockData,
+      hasApiKey: !!this.apiKey
+    });
     if (!this.apiKey && !this.useMockData) {
       console.warn('ODDS_API_KEY not found in environment variables');
     }
