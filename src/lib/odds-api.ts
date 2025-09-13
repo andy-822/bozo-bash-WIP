@@ -110,7 +110,7 @@ class OddsAPIService {
           "id": "mock123",
           "sport_key": "americanfootball_nfl",
           "sport_title": "NFL",
-          "commence_time": "2024-12-15T20:20:00Z",
+          "commence_time": "2025-09-15T20:20:00Z",
           "home_team": "Kansas City Chiefs",
           "away_team": "Buffalo Bills",
           "bookmakers": [
@@ -135,7 +135,7 @@ class OddsAPIService {
           "id": "mock456",
           "sport_key": "americanfootball_nfl", 
           "sport_title": "NFL",
-          "commence_time": "2024-12-15T17:00:00Z",
+          "commence_time": "2025-09-15T17:00:00Z",
           "home_team": "Dallas Cowboys",
           "away_team": "Philadelphia Eagles",
           "bookmakers": [
@@ -173,12 +173,18 @@ class OddsAPIService {
       throw new Error('Monthly API limit approaching. Skipping request.');
     }
 
+    // Set date range for current 2025 NFL season (September 2025 - February 2026)
+    const seasonStart = '2025-09-01T00:00:00Z';
+    const seasonEnd = '2026-02-28T23:59:59Z';
+    
     const params = new URLSearchParams({
       apiKey: this.apiKey,
       regions: 'us', // US sportsbooks only
       markets: markets.join(','),
       oddsFormat: 'american',
-      dateFormat: 'iso'
+      dateFormat: 'iso',
+      commenceTimeFrom: seasonStart,
+      commenceTimeTo: seasonEnd
     });
 
     const endpoint = `${this.baseUrl}/sports/americanfootball_nfl/odds`;
