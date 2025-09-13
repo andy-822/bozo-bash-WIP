@@ -32,6 +32,7 @@ export default function Dashboard() {
   } = useGamesWithOdds();
 
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
+  const [selectedGameWithOdds, setSelectedGameWithOdds] = useState<any>(null);
   const [selectedBetType, setSelectedBetType] = useState('moneyline');
   const [selectedBet, setSelectedBet] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,17 +41,97 @@ export default function Dashboard() {
   // Convert real games with odds to UI format
   const games = gamesWithOdds.map(formatGameData);
 
+  // Helper function to format odds
+  const formatOdds = (price: number): string => {
+    if (price > 0) return `+${price}`;
+    return price.toString();
+  };
+
+  // Generate real betting options from odds data
+  const getBettingOptions = () => {
+    if (!selectedGameWithOdds || !selectedGameWithOdds.odds.length) return {};
+    
+    const odds = selectedGameWithOdds.odds;
+    
+    // Get moneyline options
+    const moneylineOdds = odds.filter((o: any) => o.market_type === 'h2h');
+    const moneylineOptions: Array<{id: string, team: string, odds: number}> = [];
+    
+    for (const odd of moneylineOdds) {
+      const outcomes = odd.outcomes as any[];
+      for (const outcome of outcomes) {
+        const isHome = outcome.name === selectedGameWithOdds.home_team;
+        const id = isHome ? 'home-ml' : 'away-ml';
+        moneylineOptions.push({
+          id,
+          team: outcome.name,
+          odds: outcome.price
+        });
+      }
+    }
+    
+    // Get spread options
+    const spreadOdds = odds.filter((o: any) => o.market_type === 'spreads');
+    const spreadOptions: Array<{id: string, team: string, spread: number, odds: number}> = [];
+    
+    for (const odd of spreadOdds) {
+      const outcomes = odd.outcomes as any[];
+      for (const outcome of outcomes) {
+        if (outcome.point !== undefined) {
+          const isHome = outcome.name === selectedGameWithOdds.home_team;
+          const id = isHome ? 'home-spread' : 'away-spread';
+          spreadOptions.push({
+            id,
+            team: outcome.name,
+            spread: outcome.point,
+            odds: outcome.price
+          });
+        }
+      }
+    }
+    
+    // Get totals options
+    const totalsOdds = odds.filter((o: any) => o.market_type === 'totals');
+    const totalsOptions: Array<{id: string, type: string, total: number, odds: number}> = [];
+    
+    for (const odd of totalsOdds) {
+      const outcomes = odd.outcomes as any[];
+      for (const outcome of outcomes) {
+        if (outcome.point !== undefined) {
+          const id = outcome.name.toLowerCase() === 'over' ? 'over' : 'under';
+          totalsOptions.push({
+            id,
+            type: outcome.name,
+            total: outcome.point,
+            odds: outcome.price
+          });
+        }
+      }
+    }
+    
+    return {
+      moneyline: moneylineOptions.slice(0, 2), // Take first 2 (one for each team)
+      spread: spreadOptions.slice(0, 2), // Take first 2 (one for each team)
+      totals: totalsOptions.slice(0, 2) // Take first 2 (over/under)
+    };
+  };
+
+  const bettingOptions = getBettingOptions();
 
 // GameData interface moved to formatGameData.ts
 
   const handleGameSelect = (game: GameData) => {
     setSelectedGame(game);
+    // Find the corresponding game with odds
+    const gameWithOdds = gamesWithOdds.find(g => g.id === game.id);
+    setSelectedGameWithOdds(gameWithOdds);
     setSelectedBetType('moneyline');
     setSelectedBet(null);
   };
 
   const handleBackToLeague = () => {
     setSelectedGame(null);
+    setSelectedGameWithOdds(null);
     setSelectedBetType('moneyline');
     setSelectedBet(null);
     setSubmitMessage('');
@@ -66,59 +147,37 @@ export default function Dashboard() {
     setSubmitMessage('');
 
     try {
-      // Map the selected bet to submission data
+      // Map the selected bet to submission data using real odds
       let selection = '';
       let odds = 0;
 
-      switch (selectedBet) {
-        case 'kc-ml':
-          selection = `${selectedGame.homeTeam} ML`;
-          odds = -300;
-          break;
-        case 'buf-ml':
-          selection = `${selectedGame.awayTeam} ML`;
-          odds = +240;
-          break;
-        case 'kc-spread':
-          selection = 'Chiefs -2.5';
-          odds = -110;
-          break;
-        case 'buf-spread':
-          selection = 'Bills +2.5';
-          odds = -110;
-          break;
-        case 'over':
-          selection = 'Over 54.5';
-          odds = -110;
-          break;
-        case 'under':
-          selection = 'Under 54.5';
-          odds = -110;
-          break;
-        default:
-          throw new Error('Invalid bet selection');
+      // Find the selected bet in the real betting options
+      const allOptions = [
+        ...(bettingOptions.moneyline || []).map((opt: any) => ({ ...opt, type: 'moneyline' })),
+        ...(bettingOptions.spread || []).map((opt: any) => ({ ...opt, type: 'spread' })),
+        ...(bettingOptions.totals || []).map((opt: any) => ({ ...opt, type: 'totals' }))
+      ];
+
+      const selectedOption = allOptions.find((opt: any) => opt.id === selectedBet);
+
+      if (selectedOption) {
+        if (selectedOption.type === 'moneyline') {
+          selection = `${selectedOption.team} ML`;
+          odds = selectedOption.odds;
+        } else if (selectedOption.type === 'spread') {
+          const spreadText = selectedOption.spread > 0 ? `+${selectedOption.spread}` : selectedOption.spread;
+          selection = `${selectedOption.team.split(' ').slice(-2).join(' ')} ${spreadText}`;
+          odds = selectedOption.odds;
+        } else if (selectedOption.type === 'totals') {
+          selection = `${selectedOption.type} ${selectedOption.total}`;
+          odds = selectedOption.odds;
+        }
+      } else {
+        throw new Error('Invalid bet selection');
       }
 
-      // Get the first available game from the current season
-      // Since we're using mock data in the UI, we'll just use any game from the season
-      console.log('Looking for games in season:', currentSeason.id);
-      const { data: games, error: gameError } = await supabase
-        .from('games')
-        .select('id, home_team, away_team')
-        .eq('season_id', currentSeason.id)
-        .limit(5);
-
-      console.log('Games found:', games?.length || 0, 'Error:', gameError);
-
-      if (gameError) {
-        throw new Error(`Database error: ${gameError.message}`);
-      }
-
-      if (!games || games.length === 0) {
-        throw new Error(`No games found for season "${currentSeason.name}". The league creator needs to add games for this season.`);
-      }
-
-      const gameId = games[0].id;
+      // Use the actual selected game ID
+      const gameId = selectedGame.id;
 
       // Use upsert to either insert or update - this handles duplicates automatically
       const { error } = await supabase
@@ -148,6 +207,7 @@ export default function Dashboard() {
       // Clear selections after successful submission
       setTimeout(() => {
         setSelectedGame(null);
+        setSelectedGameWithOdds(null);
         setSelectedBetType('moneyline');
         setSelectedBet(null);
         setSubmitMessage('');
@@ -468,24 +528,22 @@ export default function Dashboard() {
                     >
                       <div className="font-semibold text-white mb-3">Moneyline</div>
                       <div className="space-y-2">
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'kc-ml' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('kc-ml'); }}
-                        >
-                          <span>{selectedGame.homeTeam}</span>
-                          <span className="font-semibold">-300</span>
-                        </div>
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'buf-ml' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('buf-ml'); }}
-                        >
-                          <span>{selectedGame.awayTeam}</span>
-                          <span className="font-semibold">+240</span>
-                        </div>
+                        {bettingOptions.moneyline && bettingOptions.moneyline.length > 0 ? (
+                          bettingOptions.moneyline.map((option: any) => (
+                            <div 
+                              key={option.id}
+                              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
+                                selectedBet === option.id ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); setSelectedBet(option.id); }}
+                            >
+                              <span>{option.team}</span>
+                              <span className="font-semibold">{formatOdds(option.odds)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-gray-400 text-sm p-3">No moneyline odds available</div>
+                        )}
                       </div>
                     </div>
 
@@ -497,24 +555,22 @@ export default function Dashboard() {
                     >
                       <div className="font-semibold text-white mb-3">Point Spread</div>
                       <div className="space-y-2">
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'kc-spread' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('kc-spread'); }}
-                        >
-                          <span>Chiefs -2.5</span>
-                          <span className="font-semibold">-110</span>
-                        </div>
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'buf-spread' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('buf-spread'); }}
-                        >
-                          <span>Bills +2.5</span>
-                          <span className="font-semibold">-110</span>
-                        </div>
+                        {bettingOptions.spread && bettingOptions.spread.length > 0 ? (
+                          bettingOptions.spread.map((option: any) => (
+                            <div 
+                              key={option.id}
+                              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
+                                selectedBet === option.id ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); setSelectedBet(option.id); }}
+                            >
+                              <span>{option.team.split(' ').slice(-2).join(' ')} {option.spread > 0 ? '+' : ''}{option.spread}</span>
+                              <span className="font-semibold">{formatOdds(option.odds)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-gray-400 text-sm p-3">No spread odds available</div>
+                        )}
                       </div>
                     </div>
 
@@ -526,24 +582,22 @@ export default function Dashboard() {
                     >
                       <div className="font-semibold text-white mb-3">Total Points</div>
                       <div className="space-y-2">
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'over' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('over'); }}
-                        >
-                          <span>Over 54.5</span>
-                          <span className="font-semibold">-110</span>
-                        </div>
-                        <div 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedBet === 'under' ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedBet('under'); }}
-                        >
-                          <span>Under 54.5</span>
-                          <span className="font-semibold">-110</span>
-                        </div>
+                        {bettingOptions.totals && bettingOptions.totals.length > 0 ? (
+                          bettingOptions.totals.map((option: any) => (
+                            <div 
+                              key={option.id}
+                              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
+                                selectedBet === option.id ? 'bg-cyan-400 text-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); setSelectedBet(option.id); }}
+                            >
+                              <span>{option.type} {option.total}</span>
+                              <span className="font-semibold">{formatOdds(option.odds)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-gray-400 text-sm p-3">No totals odds available</div>
+                        )}
                       </div>
                     </div>
                   </div>

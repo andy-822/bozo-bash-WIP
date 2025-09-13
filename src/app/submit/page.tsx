@@ -8,7 +8,8 @@ import Header from '@/components/ui/Header';
 import AppWrapper from '@/components/AppWrapper';
 import { useUser } from '@/contexts/UserContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { useGames } from '@/hooks/useGames';
+import { useGamesWithOdds } from '@/hooks/useGamesWithOdds';
+import { formatGameData } from '@/lib/formatGameData';
 import { formatOdds } from '@/lib/data';
 import { BetType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +25,8 @@ export default function SubmitPick() {
   const router = useRouter();
   const { currentUser } = useUser();
   const { currentLeague, currentSeason } = useLeague();
-  const { games, loading: gamesLoading, error: gamesError } = useGames();
+  const { games: gamesWithOdds, loading: gamesLoading, error: gamesError } = useGamesWithOdds();
+  const games = gamesWithOdds.map(formatGameData);
   const [formData, setFormData] = useState<PickFormData>({
     gameId: '',
     betType: 'moneyline',
@@ -102,6 +104,7 @@ export default function SubmitPick() {
   };
 
   const selectedGame = games.find(game => game.id === formData.gameId);
+  const selectedGameWithOdds = gamesWithOdds.find(game => game.id === formData.gameId);
   const oddsNumber = parseFloat(formData.odds) || 0;
   
   // Simple potential winnings calculation for American odds
@@ -117,22 +120,59 @@ export default function SubmitPick() {
   const potentialWinnings = calculateWinnings(oddsNumber, 10);
 
   const getBetTypeOptions = () => {
+    if (!selectedGameWithOdds || !selectedGameWithOdds.odds.length) return [];
+    
+    const odds = selectedGameWithOdds.odds;
+    
     switch (formData.betType) {
-      case 'spread':
-        return selectedGame ? [
-          `${selectedGame.home_team} -3.5`,
-          `${selectedGame.away_team} +3.5`,
-          `${selectedGame.home_team} -7.5`,
-          `${selectedGame.away_team} +7.5`,
-        ] : [];
+      case 'spread': {
+        const spreadOdds = odds.filter(o => o.market_type === 'spreads');
+        const options: string[] = [];
+        
+        for (const odd of spreadOdds) {
+          const outcomes = odd.outcomes as any[];
+          for (const outcome of outcomes) {
+            if (outcome.point !== undefined) {
+              const sign = outcome.point > 0 ? '+' : '';
+              options.push(`${outcome.name} ${sign}${outcome.point} (${formatOdds(outcome.price)})`);
+            }
+          }
+        }
+        
+        return [...new Set(options)]; // Remove duplicates
+      }
+      
       case 'over':
-      case 'under':
-        return ['Over 47.5', 'Under 47.5', 'Over 52.5', 'Under 52.5'];
-      case 'moneyline':
-        return selectedGame ? [
-          `${selectedGame.home_team} ML`,
-          `${selectedGame.away_team} ML`,
-        ] : [];
+      case 'under': {
+        const totalsOdds = odds.filter(o => o.market_type === 'totals');
+        const options: string[] = [];
+        
+        for (const odd of totalsOdds) {
+          const outcomes = odd.outcomes as any[];
+          for (const outcome of outcomes) {
+            if (outcome.point !== undefined && outcome.name.toLowerCase() === formData.betType) {
+              options.push(`${outcome.name} ${outcome.point} (${formatOdds(outcome.price)})`);
+            }
+          }
+        }
+        
+        return [...new Set(options)]; // Remove duplicates
+      }
+      
+      case 'moneyline': {
+        const moneylineOdds = odds.filter(o => o.market_type === 'h2h');
+        const options: string[] = [];
+        
+        for (const odd of moneylineOdds) {
+          const outcomes = odd.outcomes as any[];
+          for (const outcome of outcomes) {
+            options.push(`${outcome.name} (${formatOdds(outcome.price)})`);
+          }
+        }
+        
+        return [...new Set(options)]; // Remove duplicates
+      }
+      
       default:
         return [];
     }
@@ -253,13 +293,7 @@ export default function SubmitPick() {
                     <option value="">Choose a game...</option>
                     {games.map(game => (
                       <option key={game.id} value={game.id}>
-                        {game.away_team} @ {game.home_team} - {new Intl.DateTimeFormat('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        }).format(new Date(game.game_time))}
+                        {game.awayTeam} @ {game.homeTeam} - {game.time}
                       </option>
                     ))}
                   </select>
@@ -381,7 +415,7 @@ export default function SubmitPick() {
                   <div>
                     <p className="text-sm text-gray-400">Game</p>
                     <p className="text-white font-medium">
-                      {selectedGame.away_team} @ {selectedGame.home_team}
+                      {selectedGame.awayTeam} @ {selectedGame.homeTeam}
                     </p>
                   </div>
 
