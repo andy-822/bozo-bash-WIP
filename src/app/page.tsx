@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
   const [selectedBetType, setSelectedBetType] = useState('moneyline');
-  const [selectedBet, setSelectedBet] = useState(null);
+  const [selectedBet, setSelectedBet] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
