@@ -240,13 +240,19 @@ class OddsAPIService {
       }
 
       // Process each bookmaker's odds
+      console.log(`Processing ${game.bookmakers.length} bookmakers for game: ${game.away_team} @ ${game.home_team}`);
+      
       for (const bookmaker of game.bookmakers) {
+        console.log(`Processing bookmaker: ${bookmaker.key}`);
+        
         // Get or create sportsbook
-        const { data: sportsbook } = await supabase
+        const { data: sportsbook, error: sportsbookError } = await supabase
           .from('sportsbooks')
           .select('id')
           .eq('key', bookmaker.key)
           .single();
+
+        console.log(`Sportsbook query result:`, { sportsbook, error: sportsbookError });
 
         if (!sportsbook) {
           console.warn(`Unknown sportsbook: ${bookmaker.key}`);
@@ -254,11 +260,15 @@ class OddsAPIService {
         }
 
         // Store each market type
+        console.log(`Processing ${bookmaker.markets.length} markets for ${bookmaker.key}`);
+        
         for (const market of bookmaker.markets) {
           const expiresAt = new Date();
           expiresAt.setHours(expiresAt.getHours() + 6); // Odds expire after 6 hours
 
-          await supabase
+          console.log(`Storing odds for market: ${market.key}`);
+          
+          const { data: oddsResult, error: oddsError } = await supabase
             .from('odds')
             .upsert({
               game_id: dbGame.id,
@@ -270,6 +280,8 @@ class OddsAPIService {
             }, {
               onConflict: 'game_id,sportsbook_id,market_type,market_key'
             });
+            
+          console.log(`Odds storage result:`, { data: oddsResult, error: oddsError });
         }
       }
     }
