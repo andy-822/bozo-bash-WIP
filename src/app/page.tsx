@@ -396,7 +396,12 @@ interface GameData {
                             <div className="text-gray-400 text-sm capitalize">{pick.bet_type}</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-cyan-400 font-semibold">{pick.odds > 0 ? `+${pick.odds}` : pick.odds}</div>
+                            <div className="text-cyan-400 font-semibold">
+                              {pick.odds !== null && pick.odds !== undefined 
+                                ? (pick.odds > 0 ? `+${pick.odds}` : pick.odds.toString())
+                                : 'N/A'
+                              }
+                            </div>
                             <div className={`text-xs px-2 py-1 rounded ${
                               pick.status === 'won' ? 'bg-green-400/20 text-green-400' :
                               pick.status === 'lost' ? 'bg-red-400/20 text-red-400' :
