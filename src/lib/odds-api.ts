@@ -212,9 +212,11 @@ class OddsAPIService {
     console.log('Processing odds for games:', oddsData.map(g => `${g.away_team} @ ${g.home_team}`));
     
     // Get all games in database for comparison
-    const { data: allGames } = await supabase
+    const { data: allGames, error: gamesQueryError } = await supabase
       .from('games')
-      .select('id, home_team, away_team');
+      .select('id, home_team, away_team, season_id');
+    
+    console.log('Database query result:', { allGames, error: gamesQueryError });
     
     console.log('Database games:', allGames?.map(g => `${g.away_team} @ ${g.home_team}`));
     
