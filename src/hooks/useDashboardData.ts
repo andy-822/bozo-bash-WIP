@@ -95,7 +95,8 @@ export function useDashboardData(): DashboardData {
         overallHitRate,
         submittedPicks,
         totalPicks,
-        loading: false
+        loading: false,
+        refreshData: loadDashboardData
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
