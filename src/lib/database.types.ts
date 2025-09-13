@@ -285,6 +285,123 @@ export interface Database {
           }
         ]
       }
+      odds: {
+        Row: {
+          id: string
+          game_id: string
+          sportsbook_id: string
+          market_type: string
+          market_key: string | null
+          outcomes: Json
+          fetched_at: string
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          game_id: string
+          sportsbook_id: string
+          market_type: string
+          market_key?: string | null
+          outcomes: Json
+          expires_at: string
+          fetched_at?: string
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          game_id?: string
+          sportsbook_id?: string
+          market_type?: string
+          market_key?: string | null
+          outcomes?: Json
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "odds_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "odds_sportsbook_id_fkey"
+            columns: ["sportsbook_id"]
+            isOneToOne: false
+            referencedRelation: "sportsbooks"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      odds_api_requests: {
+        Row: {
+          id: string
+          endpoint: string
+          sport: string
+          markets: string
+          requests_used: number
+          requests_remaining: number
+          success: boolean
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          endpoint: string
+          sport: string
+          markets: string
+          requests_used: number
+          requests_remaining: number
+          success?: boolean
+          error_message?: string | null
+          id?: string
+          created_at?: string
+        }
+        Update: {
+          endpoint?: string
+          sport?: string
+          markets?: string
+          requests_used?: number
+          requests_remaining?: number
+          success?: boolean
+          error_message?: string | null
+          id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      sportsbooks: {
+        Row: {
+          id: string
+          key: string
+          title: string
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          title: string
+          active?: boolean
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          title?: string
+          active?: boolean
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

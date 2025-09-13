@@ -42,7 +42,7 @@ class OddsAPIService {
     }
   }
 
-  // Track API usage in console (database table not created yet)
+  // Track API usage in database
   private async logRequest(
     endpoint: string, 
     sport: string, 
@@ -51,24 +51,38 @@ class OddsAPIService {
     success: boolean = true, 
     error?: string
   ) {
-    console.log('API Request:', {
-      endpoint,
-      sport,
-      markets: markets.join(','),
-      requests_used: usage.requests_used,
-      requests_remaining: usage.requests_remaining,
-      success,
-      error_message: error,
-      timestamp: new Date().toISOString()
-    });
+    try {
+      await supabase.from('odds_api_requests').insert({
+        endpoint,
+        sport,
+        markets: markets.join(','),
+        requests_used: usage.requests_used,
+        requests_remaining: usage.requests_remaining,
+        success,
+        error_message: error
+      });
+    } catch (err) {
+      console.error('Failed to log API request:', err);
+    }
   }
 
-  // Get current month's usage (simplified for now)
+  // Get current month's usage from database
   async getCurrentMonthUsage(): Promise<number> {
-    // For now, return 0 since we don't have usage tracking table
-    // In production, you'd want to create the odds_api_requests table
-    console.log('Usage tracking not implemented yet');
-    return 0;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('odds_api_requests')
+      .select('requests_used')
+      .gte('created_at', startOfMonth.toISOString());
+
+    if (error) {
+      console.error('Error fetching usage:', error);
+      return 0;
+    }
+
+    return data?.reduce((total, req) => total + req.requests_used, 0) || 0;
   }
 
   // Check if we should make a request based on usage limits
@@ -130,27 +144,77 @@ class OddsAPIService {
     }
   }
 
-  // Store odds data (simplified for now - logs to console)
+  // Store odds data in our database
   async storeOddsData(oddsData: OddsAPIResponse[]): Promise<void> {
-    console.log('Odds data received:', {
-      gamesCount: oddsData.length,
-      games: oddsData.map(game => ({
-        id: game.id,
-        teams: `${game.away_team} @ ${game.home_team}`,
-        commence_time: game.commence_time,
-        bookmakers: game.bookmakers.length
-      }))
-    });
-    
-    // TODO: Implement odds storage when database schema is complete
-    console.log('Odds storage not implemented yet - would store to sportsbooks/odds tables');
+    for (const game of oddsData) {
+      // Find matching game in our database by team names and date
+      const { data: dbGame, error: gameError } = await supabase
+        .from('games')
+        .select('id')
+        .eq('home_team', game.home_team)
+        .eq('away_team', game.away_team)
+        .single();
+
+      if (gameError || !dbGame) {
+        console.warn(`No matching game found for ${game.away_team} @ ${game.home_team}`);
+        continue;
+      }
+
+      // Process each bookmaker's odds
+      for (const bookmaker of game.bookmakers) {
+        // Get or create sportsbook
+        const { data: sportsbook } = await supabase
+          .from('sportsbooks')
+          .select('id')
+          .eq('key', bookmaker.key)
+          .single();
+
+        if (!sportsbook) {
+          console.warn(`Unknown sportsbook: ${bookmaker.key}`);
+          continue;
+        }
+
+        // Store each market type
+        for (const market of bookmaker.markets) {
+          const expiresAt = new Date();
+          expiresAt.setHours(expiresAt.getHours() + 6); // Odds expire after 6 hours
+
+          await supabase
+            .from('odds')
+            .upsert({
+              game_id: dbGame.id,
+              sportsbook_id: sportsbook.id,
+              market_type: market.key,
+              market_key: market.key,
+              outcomes: market.outcomes,
+              expires_at: expiresAt.toISOString()
+            }, {
+              onConflict: 'game_id,sportsbook_id,market_type,market_key'
+            });
+        }
+      }
+    }
   }
 
-  // Get stored odds for a game (simplified for now)
+  // Get stored odds for a game
   async getGameOdds(gameId: string, marketTypes: string[] = ['h2h', 'spreads', 'totals']) {
-    console.log('Fetching odds for game:', gameId, 'markets:', marketTypes);
-    // TODO: Implement when odds table exists
-    return [];
+    const { data, error } = await supabase
+      .from('odds')
+      .select(`
+        *,
+        sportsbooks (key, title)
+      `)
+      .eq('game_id', gameId)
+      .in('market_type', marketTypes)
+      .gt('expires_at', new Date().toISOString()) // Only non-expired odds
+      .order('fetched_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching odds:', error);
+      return [];
+    }
+
+    return data;
   }
 
   // Full sync: fetch and store NFL odds
