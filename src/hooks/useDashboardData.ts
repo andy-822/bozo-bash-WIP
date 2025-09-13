@@ -20,7 +20,7 @@ interface DashboardData {
 
 export function useDashboardData(): DashboardData {
   const { currentLeague, currentSeason } = useLeague();
-  const [data, setData] = useState({
+  const [data, setData] = useState<DashboardData>({
     currentWeekPicks: [],
     totalUsers: 0,
     totalSeason: 0,
@@ -28,7 +28,8 @@ export function useDashboardData(): DashboardData {
     overallHitRate: 0,
     submittedPicks: 0,
     totalPicks: 0,
-    loading: true
+    loading: true,
+    refreshData: async () => {}
   });
 
   // delete mex
