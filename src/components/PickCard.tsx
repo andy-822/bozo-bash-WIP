@@ -21,9 +21,15 @@ export default function PickCard({ pick, showUser = true }: PickCardProps) {
   const user = isDatabasePick ? null : (pick as Pick).user; // Database picks don't have user data embedded yet
   
   // Handle database vs legacy game field differences
-  const awayTeam = isDatabasePick ? (game as any).away_team : (game as any).awayTeam;
-  const homeTeam = isDatabasePick ? (game as any).home_team : (game as any).homeTeam;
-  const gameTime = isDatabasePick ? (game as any).game_time : (game as any).gameTime;
+  const awayTeam = isDatabasePick 
+    ? (game as Database['public']['Tables']['games']['Row']).away_team 
+    : (game as { awayTeam: string }).awayTeam;
+  const homeTeam = isDatabasePick 
+    ? (game as Database['public']['Tables']['games']['Row']).home_team 
+    : (game as { homeTeam: string }).homeTeam;
+  const gameTime = isDatabasePick 
+    ? (game as Database['public']['Tables']['games']['Row']).game_time 
+    : (game as { gameTime: string | Date }).gameTime;
   
   // Handle betType difference (bet_type vs betType)
   const betType = isDatabasePick ? (pick as DatabasePick).bet_type : (pick as Pick).betType;

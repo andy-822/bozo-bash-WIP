@@ -15,7 +15,7 @@ export function useGames() {
     if (currentSeason) {
       loadGames();
     }
-  }, [currentSeason]);
+  }, [currentSeason, loadGames]);
 
   const loadGames = async () => {
     if (!currentSeason) return;

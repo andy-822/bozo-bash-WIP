@@ -15,11 +15,12 @@ interface DashboardData {
   submittedPicks: number;
   totalPicks: number;
   loading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData {
   const { currentLeague, currentSeason } = useLeague();
-  const [data, setData] = useState<DashboardData>({
+  const [data, setData] = useState({
     currentWeekPicks: [],
     totalUsers: 0,
     totalSeason: 0,
@@ -29,12 +30,6 @@ export function useDashboardData(): DashboardData {
     totalPicks: 0,
     loading: true
   });
-
-  useEffect(() => {
-    if (currentLeague && currentSeason) {
-      loadDashboardData();
-    }
-  }, [currentLeague, currentSeason]);
 
   const loadDashboardData = async () => {
     if (!currentLeague || !currentSeason) return;
@@ -85,7 +80,7 @@ export function useDashboardData(): DashboardData {
       const totalWins = allPicksData?.filter(pick => pick.status === 'won').length || 0;
       const overallHitRate = totalSeason > 0 ? (totalWins / totalSeason) * 100 : 0;
       const submittedPicks = picksData?.length || 0;
-      
+
       // For now, assume each user can submit one pick per week
       const totalPicks = totalUsers;
 
@@ -105,5 +100,14 @@ export function useDashboardData(): DashboardData {
     }
   };
 
-  return data;
+  useEffect(() => {
+    if (currentLeague && currentSeason) {
+      loadDashboardData();
+    }
+  }, [currentLeague, currentSeason]);
+
+  return {
+    ...data,
+    refreshData: loadDashboardData
+  };
 }

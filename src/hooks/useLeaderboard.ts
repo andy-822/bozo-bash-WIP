@@ -78,7 +78,7 @@ export function useLeaderboard(): LeaderboardData {
       
       // Initialize all league members
       membersData?.forEach((member) => {
-        const user = member.users as any;
+        const user = member.users as { email?: string; user_metadata?: { full_name?: string } } | null;
         const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Unknown User';
         
         userStatsMap.set(member.user_id, {

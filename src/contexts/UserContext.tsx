@@ -66,7 +66,10 @@ export function UserProvider({ children }: UserProviderProps) {
                 };
 
                 // Keep it simple: avoid generics/comments in a chain that can confuse TSX parsing
-                await (supabase.from('users') as any).insert([payload]);
+                const { error: insertError } = await supabase.from('users').insert([payload]);
+                if (insertError) {
+                    console.error('Error inserting user:', insertError);
+                }
             }
 
         } catch (error) {
