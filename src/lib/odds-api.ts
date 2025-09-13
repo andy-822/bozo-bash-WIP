@@ -240,9 +240,45 @@ class OddsAPIService {
         .eq('away_team', game.away_team)
         .single();
 
+      let gameId: string;
+      
       if (gameError || !dbGame) {
-        console.warn(`No matching game found for ${game.away_team} @ ${game.home_team}`);
-        continue;
+        console.log(`No matching game found for ${game.away_team} @ ${game.home_team}, creating new game...`);
+        
+        // Get the active season (you might want to make this more robust)
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id')
+          .eq('is_active', true)
+          .single();
+          
+        if (!activeSeason) {
+          console.error('No active season found, skipping game creation');
+          continue;
+        }
+        
+        // Create the missing game
+        const { data: newGame, error: createError } = await supabase
+          .from('games')
+          .insert({
+            season_id: activeSeason.id,
+            home_team: game.home_team,
+            away_team: game.away_team,
+            game_time: game.commence_time,
+            week: Math.ceil((new Date(game.commence_time).getTime() - new Date('2025-09-01').getTime()) / (7 * 24 * 60 * 60 * 1000)) // Rough week calculation
+          })
+          .select('id')
+          .single();
+          
+        if (createError || !newGame) {
+          console.error(`Failed to create game ${game.away_team} @ ${game.home_team}:`, createError);
+          continue;
+        }
+        
+        gameId = newGame.id;
+        console.log(`Created new game: ${game.away_team} @ ${game.home_team} with ID ${gameId}`);
+      } else {
+        gameId = dbGame.id;
       }
 
       // Process each bookmaker's odds
@@ -277,7 +313,7 @@ class OddsAPIService {
           const { data: oddsResult, error: oddsError } = await supabase
             .from('odds')
             .upsert({
-              game_id: dbGame.id,
+              game_id: gameId,
               sportsbook_id: sportsbook.id,
               market_type: market.key,
               market_key: market.key,
