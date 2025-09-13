@@ -11,12 +11,6 @@ export function useGames() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (currentSeason) {
-      loadGames();
-    }
-  }, [currentSeason, loadGames]);
-
   const loadGames = async () => {
     if (!currentSeason) return;
 
@@ -42,6 +36,12 @@ export function useGames() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (currentSeason) {
+      loadGames();
+    }
+  }, [currentSeason]);
 
   return {
     games,
