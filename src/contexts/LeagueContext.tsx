@@ -191,16 +191,17 @@ export function LeagueProvider({children}: LeagueProviderProps) {
 
         console.log('Membership created');
 
-        // Create default NFL season
+        // Create default NFL season - current 2025 season
         const {data: seasonData, error: seasonError} = await supabase
             .from('seasons')
             .insert({
                 league_id: data.id,
-                name: '2024 NFL Season',
+                name: '2025 NFL Season',
                 sport: 'NFL',
-                year: 2024,
-                start_date: '2024-09-01',
-                end_date: '2025-02-15'
+                year: 2025,
+                start_date: '2025-09-04',
+                end_date: '2026-01-04',
+                is_active: true
             } satisfies Database['public']['Tables']['seasons']['Insert'])
             .select()
             .single();
