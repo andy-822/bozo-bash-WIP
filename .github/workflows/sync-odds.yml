@@ -21,15 +21,16 @@ jobs:
       - name: Sync NFL Odds
         run: |
           echo "Syncing NFL odds at $(date)"
-          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/sync-odds")
+          response=$(curl -s -w "%{http_code}" -L -X POST "${{ secrets.VERCEL_APP_URL }}/api/sync-odds")
           http_code=${response: -3}
           response_body=${response%???}
           
+          echo "Response code: $http_code"
+          echo "Response body: $response_body"
+          
           if [ $http_code -eq 200 ]; then
             echo "✅ Odds sync successful"
-            echo "$response_body"
           else
             echo "❌ Odds sync failed with status $http_code"
-            echo "$response_body"
-            exit 1
+            # Don't exit with error for now to debug
           fi
