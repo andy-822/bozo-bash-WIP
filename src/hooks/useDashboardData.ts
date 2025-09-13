@@ -31,6 +31,8 @@ export function useDashboardData(): DashboardData {
     loading: true
   });
 
+  // delete me
+
   const loadDashboardData = async () => {
     if (!currentLeague || !currentSeason) return;
 
