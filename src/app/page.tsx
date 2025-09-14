@@ -32,7 +32,7 @@ export default function Dashboard() {
   } = useGamesWithOdds();
 
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
-  const [selectedGameWithOdds, setSelectedGameWithOdds] = useState<any>(null);
+  const [selectedGameWithOdds, setSelectedGameWithOdds] = useState<typeof gamesWithOdds[0] | null>(null);
   const [selectedBetType, setSelectedBetType] = useState('moneyline');
   const [selectedBet, setSelectedBet] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,11 +54,11 @@ export default function Dashboard() {
     const odds = selectedGameWithOdds.odds;
     
     // Get moneyline options
-    const moneylineOdds = odds.filter((o: any) => o.market_type === 'h2h');
+    const moneylineOdds = odds.filter((o) => o.market_type === 'h2h');
     const moneylineOptions: Array<{id: string, team: string, odds: number}> = [];
     
     for (const odd of moneylineOdds) {
-      const outcomes = odd.outcomes as any[];
+      const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
       for (const outcome of outcomes) {
         const isHome = outcome.name === selectedGameWithOdds.home_team;
         const id = isHome ? 'home-ml' : 'away-ml';
@@ -71,11 +71,11 @@ export default function Dashboard() {
     }
     
     // Get spread options
-    const spreadOdds = odds.filter((o: any) => o.market_type === 'spreads');
+    const spreadOdds = odds.filter((o) => o.market_type === 'spreads');
     const spreadOptions: Array<{id: string, team: string, spread: number, odds: number}> = [];
     
     for (const odd of spreadOdds) {
-      const outcomes = odd.outcomes as any[];
+      const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
       for (const outcome of outcomes) {
         if (outcome.point !== undefined) {
           const isHome = outcome.name === selectedGameWithOdds.home_team;
@@ -91,11 +91,11 @@ export default function Dashboard() {
     }
     
     // Get totals options
-    const totalsOdds = odds.filter((o: any) => o.market_type === 'totals');
+    const totalsOdds = odds.filter((o) => o.market_type === 'totals');
     const totalsOptions: Array<{id: string, type: string, total: number, odds: number}> = [];
     
     for (const odd of totalsOdds) {
-      const outcomes = odd.outcomes as any[];
+      const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
       for (const outcome of outcomes) {
         if (outcome.point !== undefined) {
           const id = outcome.name.toLowerCase() === 'over' ? 'over' : 'under';
@@ -153,12 +153,12 @@ export default function Dashboard() {
 
       // Find the selected bet in the real betting options
       const allOptions = [
-        ...(bettingOptions.moneyline || []).map((opt: any) => ({ ...opt, type: 'moneyline' })),
-        ...(bettingOptions.spread || []).map((opt: any) => ({ ...opt, type: 'spread' })),
-        ...(bettingOptions.totals || []).map((opt: any) => ({ ...opt, type: 'totals' }))
+        ...(bettingOptions.moneyline || []).map((opt) => ({ ...opt, type: 'moneyline' as const })),
+        ...(bettingOptions.spread || []).map((opt) => ({ ...opt, type: 'spread' as const })),
+        ...(bettingOptions.totals || []).map((opt) => ({ ...opt, type: 'totals' as const }))
       ];
 
-      const selectedOption = allOptions.find((opt: any) => opt.id === selectedBet);
+      const selectedOption = allOptions.find((opt) => opt.id === selectedBet);
 
       if (selectedOption) {
         if (selectedOption.type === 'moneyline') {
@@ -529,7 +529,7 @@ export default function Dashboard() {
                       <div className="font-semibold text-white mb-3">Moneyline</div>
                       <div className="space-y-2">
                         {bettingOptions.moneyline && bettingOptions.moneyline.length > 0 ? (
-                          bettingOptions.moneyline.map((option: any) => (
+                          bettingOptions.moneyline.map((option) => (
                             <div 
                               key={option.id}
                               className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
@@ -556,7 +556,7 @@ export default function Dashboard() {
                       <div className="font-semibold text-white mb-3">Point Spread</div>
                       <div className="space-y-2">
                         {bettingOptions.spread && bettingOptions.spread.length > 0 ? (
-                          bettingOptions.spread.map((option: any) => (
+                          bettingOptions.spread.map((option) => (
                             <div 
                               key={option.id}
                               className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
@@ -583,7 +583,7 @@ export default function Dashboard() {
                       <div className="font-semibold text-white mb-3">Total Points</div>
                       <div className="space-y-2">
                         {bettingOptions.totals && bettingOptions.totals.length > 0 ? (
-                          bettingOptions.totals.map((option: any) => (
+                          bettingOptions.totals.map((option) => (
                             <div 
                               key={option.id}
                               className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${

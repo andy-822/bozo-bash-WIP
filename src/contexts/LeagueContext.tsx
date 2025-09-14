@@ -7,6 +7,48 @@ import {Database} from '@/lib/database.types';
 
 type League = Database['public']['Tables']['leagues']['Row'];
 type Season = Database['public']['Tables']['seasons']['Row'];
+type LeagueInvitation = {
+  id: string;
+  league_id: string;
+  inviter_id: string;
+  email?: string;
+  invited_user_id?: string;
+  invite_token: string;
+  invite_link: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+  role: 'member' | 'admin';
+  message?: string;
+  expires_at: string;
+  accepted_by?: string;
+  accepted_at?: string;
+  declined_at?: string;
+  created_at: string;
+  updated_at: string;
+  league?: League;
+  inviter?: {
+    name: string;
+    email: string;
+    avatar_url?: string;
+  };
+};
+
+type LeagueJoinRequest = {
+  id: string;
+  league_id: string;
+  user_id: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  review_message?: string;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    name: string;
+    email: string;
+    avatar_url?: string;
+  };
+};
 
 interface LeagueContextType {
     currentLeague: League | null;
@@ -19,6 +61,29 @@ interface LeagueContextType {
     createLeague: (name: string, description?: string) => Promise<League>;
     joinLeague: (inviteCode: string) => Promise<void>;
     refreshLeagues: () => Promise<void>;
+
+    // Enhanced invitation functions
+    sendEmailInvitation: (leagueId: string, email: string, role?: 'member' | 'admin', message?: string) => Promise<LeagueInvitation>;
+    sendDirectInvitation: (leagueId: string, userId: string, role?: 'member' | 'admin', message?: string) => Promise<LeagueInvitation>;
+    createInviteLink: (leagueId: string, role?: 'member' | 'admin', expiresInDays?: number) => Promise<LeagueInvitation>;
+    acceptInvitation: (inviteToken: string) => Promise<{success: boolean, league_id?: string, error?: string}>;
+    declineInvitation: (inviteToken: string) => Promise<void>;
+    cancelInvitation: (invitationId: string) => Promise<void>;
+    resendInvitation: (invitationId: string) => Promise<void>;
+
+    // League invitation management
+    getLeagueInvitations: (leagueId: string) => Promise<LeagueInvitation[]>;
+    getUserInvitations: () => Promise<LeagueInvitation[]>;
+
+    // Join requests (for approval workflow)
+    requestToJoinLeague: (leagueId: string, message?: string) => Promise<void>;
+    approveJoinRequest: (requestId: string, message?: string) => Promise<void>;
+    rejectJoinRequest: (requestId: string, message?: string) => Promise<void>;
+    getLeagueJoinRequests: (leagueId: string) => Promise<LeagueJoinRequest[]>;
+
+    // League discovery
+    getPublicLeagues: () => Promise<League[]>;
+    searchLeagues: (query: string) => Promise<League[]>;
 }
 
 const LeagueContext = createContext<LeagueContextType | undefined>(undefined);
@@ -312,6 +377,281 @@ export function LeagueProvider({children}: LeagueProviderProps) {
         await loadUserLeagues();
     };
 
+    // Enhanced invitation functions
+    const sendEmailInvitation = async (
+        leagueId: string,
+        email: string,
+        role: 'member' | 'admin' = 'member',
+        message?: string
+    ): Promise<LeagueInvitation> => {
+        if (!currentUser) throw new Error('Must be logged in to send invitations');
+
+        const { data, error } = await supabase
+            .from('league_invitations')
+            .insert({
+                league_id: leagueId,
+                inviter_id: currentUser.id,
+                email,
+                role,
+                message
+            } satisfies any)
+            .select('*, league:leagues(*), inviter:users!league_invitations_inviter_id_fkey(*)')
+            .single();
+
+        if (error) throw error;
+        return data;
+    };
+
+    const sendDirectInvitation = async (
+        leagueId: string,
+        userId: string,
+        role: 'member' | 'admin' = 'member',
+        message?: string
+    ): Promise<LeagueInvitation> => {
+        if (!currentUser) throw new Error('Must be logged in to send invitations');
+
+        const { data, error } = await supabase
+            .from('league_invitations')
+            .insert({
+                league_id: leagueId,
+                inviter_id: currentUser.id,
+                invited_user_id: userId,
+                role,
+                message
+            } satisfies any)
+            .select('*, league:leagues(*), inviter:users!league_invitations_inviter_id_fkey(*)')
+            .single();
+
+        if (error) throw error;
+        return data;
+    };
+
+    const createInviteLink = async (
+        leagueId: string,
+        role: 'member' | 'admin' = 'member',
+        expiresInDays: number = 7
+    ): Promise<LeagueInvitation> => {
+        if (!currentUser) throw new Error('Must be logged in to create invite links');
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+
+        const { data, error } = await supabase
+            .from('league_invitations')
+            .insert({
+                league_id: leagueId,
+                inviter_id: currentUser.id,
+                role,
+                expires_at: expiresAt.toISOString()
+            } satisfies any)
+            .select('*, league:leagues(*), inviter:users!league_invitations_inviter_id_fkey(*)')
+            .single();
+
+        if (error) throw error;
+        return data;
+    };
+
+    const acceptInvitation = async (inviteToken: string) => {
+        if (!currentUser) throw new Error('Must be logged in to accept invitations');
+
+        const { data, error } = await supabase.rpc('accept_league_invitation', {
+            invitation_token: inviteToken
+        });
+
+        if (error) throw error;
+
+        if (data.success) {
+            await refreshLeagues();
+        }
+
+        return data;
+    };
+
+    const declineInvitation = async (inviteToken: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to decline invitations');
+
+        const { error } = await supabase
+            .from('league_invitations')
+            .update({
+                status: 'declined',
+                declined_at: new Date().toISOString()
+            })
+            .eq('invite_token', inviteToken)
+            .eq('status', 'pending');
+
+        if (error) throw error;
+    };
+
+    const cancelInvitation = async (invitationId: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to cancel invitations');
+
+        const { error } = await supabase
+            .from('league_invitations')
+            .update({ status: 'cancelled' })
+            .eq('id', invitationId)
+            .eq('inviter_id', currentUser.id);
+
+        if (error) throw error;
+    };
+
+    const resendInvitation = async (invitationId: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to resend invitations');
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        const { error } = await supabase
+            .from('league_invitations')
+            .update({
+                status: 'pending',
+                expires_at: expiresAt.toISOString()
+            })
+            .eq('id', invitationId)
+            .eq('inviter_id', currentUser.id);
+
+        if (error) throw error;
+    };
+
+    const getLeagueInvitations = async (leagueId: string): Promise<LeagueInvitation[]> => {
+        if (!currentUser) throw new Error('Must be logged in to view invitations');
+
+        const { data, error } = await supabase
+            .from('league_invitations')
+            .select('*, league:leagues(*), inviter:users!league_invitations_inviter_id_fkey(*)')
+            .eq('league_id', leagueId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    };
+
+    const getUserInvitations = async (): Promise<LeagueInvitation[]> => {
+        if (!currentUser) throw new Error('Must be logged in to view invitations');
+
+        const { data, error } = await supabase
+            .from('league_invitations')
+            .select('*, league:leagues(*), inviter:users!league_invitations_inviter_id_fkey(*)')
+            .or(`invited_user_id.eq.${currentUser.id},email.eq.${currentUser.email}`)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    };
+
+    const requestToJoinLeague = async (leagueId: string, message?: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to request league membership');
+
+        const { error } = await supabase
+            .from('league_join_requests')
+            .insert({
+                league_id: leagueId,
+                user_id: currentUser.id,
+                message
+            } satisfies any);
+
+        if (error) {
+            if (error.code === '23505') { // Unique constraint violation
+                throw new Error('You have already requested to join this league');
+            }
+            throw error;
+        }
+    };
+
+    const approveJoinRequest = async (requestId: string, message?: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to approve join requests');
+
+        // Get the join request
+        const { data: request, error: requestError } = await supabase
+            .from('league_join_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+
+        if (requestError || !request) throw new Error('Join request not found');
+
+        // Create league membership
+        const { error: membershipError } = await supabase
+            .from('league_memberships')
+            .insert({
+                user_id: request.user_id,
+                league_id: request.league_id,
+                role: 'member',
+                invited_by: currentUser.id,
+                joined_via: 'approval'
+            } satisfies any);
+
+        if (membershipError) throw membershipError;
+
+        // Update join request status
+        const { error: updateError } = await supabase
+            .from('league_join_requests')
+            .update({
+                status: 'approved',
+                reviewed_by: currentUser.id,
+                reviewed_at: new Date().toISOString(),
+                review_message: message
+            })
+            .eq('id', requestId);
+
+        if (updateError) throw updateError;
+    };
+
+    const rejectJoinRequest = async (requestId: string, message?: string): Promise<void> => {
+        if (!currentUser) throw new Error('Must be logged in to reject join requests');
+
+        const { error } = await supabase
+            .from('league_join_requests')
+            .update({
+                status: 'rejected',
+                reviewed_by: currentUser.id,
+                reviewed_at: new Date().toISOString(),
+                review_message: message
+            })
+            .eq('id', requestId);
+
+        if (error) throw error;
+    };
+
+    const getLeagueJoinRequests = async (leagueId: string): Promise<LeagueJoinRequest[]> => {
+        if (!currentUser) throw new Error('Must be logged in to view join requests');
+
+        const { data, error } = await supabase
+            .from('league_join_requests')
+            .select('*, user:users!league_join_requests_user_id_fkey(*)')
+            .eq('league_id', leagueId)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    };
+
+    const getPublicLeagues = async (): Promise<League[]> => {
+        const { data, error } = await supabase
+            .from('leagues')
+            .select('*')
+            .eq('allow_public_join', true)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    };
+
+    const searchLeagues = async (query: string): Promise<League[]> => {
+        const { data, error } = await supabase
+            .from('leagues')
+            .select('*')
+            .eq('allow_public_join', true)
+            .eq('is_active', true)
+            .ilike('name', `%${query}%`)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    };
+
     return (
         <LeagueContext.Provider value={{
             currentLeague,
@@ -323,7 +663,28 @@ export function LeagueProvider({children}: LeagueProviderProps) {
             setCurrentSeason,
             createLeague,
             joinLeague,
-            refreshLeagues
+            refreshLeagues,
+
+            // Enhanced invitation functions
+            sendEmailInvitation,
+            sendDirectInvitation,
+            createInviteLink,
+            acceptInvitation,
+            declineInvitation,
+            cancelInvitation,
+            resendInvitation,
+            getLeagueInvitations,
+            getUserInvitations,
+
+            // Join requests
+            requestToJoinLeague,
+            approveJoinRequest,
+            rejectJoinRequest,
+            getLeagueJoinRequests,
+
+            // League discovery
+            getPublicLeagues,
+            searchLeagues
         }}>
             {children}
         </LeagueContext.Provider>

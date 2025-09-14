@@ -1,16 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Users, Code, X } from 'lucide-react';
+import { Plus, Users, Code, X, UserPlus, Settings, Crown } from 'lucide-react';
 import { useLeague } from '@/contexts/LeagueContext';
+import { useUser } from '@/contexts/UserContext';
+import InvitationManager from './InvitationManager';
 
 export default function LeagueManagement() {
-  const { 
-    userLeagues, 
-    createLeague, 
+  const {
+    userLeagues,
+    createLeague,
     joinLeague,
     refreshLeagues
   } = useLeague();
+  const { currentUser } = useUser();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -20,6 +23,9 @@ export default function LeagueManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showInvitationManager, setShowInvitationManager] = useState(false);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const handleCreateLeague = async () => {
     if (!createName.trim()) return;
@@ -58,6 +64,18 @@ export default function LeagueManagement() {
     }
   };
 
+  const handleManageInvitations = (leagueId: string, userIsAdmin: boolean) => {
+    setSelectedLeagueId(leagueId);
+    setIsAdmin(userIsAdmin);
+    setShowInvitationManager(true);
+  };
+
+  const closeInvitationManager = () => {
+    setShowInvitationManager(false);
+    setSelectedLeagueId(null);
+    setIsAdmin(false);
+  };
+
   return (
     <div className="space-y-8">
       {/* Success Message */}
@@ -79,10 +97,31 @@ export default function LeagueManagement() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">{league.name}</h3>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-lg font-semibold text-white">{league.name}</h3>
+                      {league.creator_id === currentUser?.id && (
+                        <Crown className="h-4 w-4 text-yellow-400" title="You created this league" />
+                      )}
+                    </div>
                     {league.description && (
                       <p className="text-gray-400 text-sm mb-3">{league.description}</p>
                     )}
+                  </div>
+                  {/* League Actions */}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleManageInvitations(league.id, league.creator_id === currentUser?.id)}
+                      className="text-blue-400 hover:text-blue-300 p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                      title="Manage Invitations"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="text-gray-400 hover:text-gray-300 p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                      title="League Settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -264,6 +303,15 @@ export default function LeagueManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invitation Manager Modal */}
+      {showInvitationManager && selectedLeagueId && (
+        <InvitationManager
+          leagueId={selectedLeagueId}
+          isAdmin={isAdmin}
+          onClose={closeInvitationManager}
+        />
       )}
     </div>
   );

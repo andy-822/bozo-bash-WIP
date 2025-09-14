@@ -1,37 +1,81 @@
+// import type { Config } from "tailwindcss";
+//
+// export default {
+//   content: [
+//     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+//     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+//     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+//   ],
+//   theme: {
+//     extend: {
+//       colors: {
+//         background: "var(--background)",
+//         foreground: "var(--foreground)",
+//       },
+//       animation: {
+//         'fade-in': 'fadeIn 0.5s ease-in-out',
+//         'slide-up': 'slideUp 0.3s ease-out',
+//         'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+//       },
+//       keyframes: {
+//         fadeIn: {
+//           '0%': { opacity: '0' },
+//           '100%': { opacity: '1' },
+//         },
+//         slideUp: {
+//           '0%': { transform: 'translateY(20px)', opacity: '0' },
+//           '100%': { transform: 'translateY(0)', opacity: '1' },
+//         },
+//         pulseGlow: {
+//           '0%, 100%': { boxShadow: '0 0 5px rgba(59, 130, 246, 0.5)' },
+//           '50%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.8)' },
+//         }
+//       }
+//     },
+//   },
+//   plugins: [],
+// } satisfies Config;
+
 import type { Config } from "tailwindcss";
 
 export default {
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-up': 'slideUp 0.3s ease-out',
-        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
+    content: [
+        "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+        "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+        "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    ],
+    theme: {
+        extend: {
+            colors: {
+                background: "var(--background)",
+                foreground: "var(--foreground)",
+                // Add these new colors
+                primary: '#0D6EFD',
+                success: '#198754',
+                danger: '#AB2E3C',
+                warning: '#FFC107',
+                ui_element: '#1A1B23'
+            },
+            animation: {
+                'fade-in': 'fadeIn 0.5s ease-in-out',
+                'slide-up': 'slideUp 0.3s ease-out',
+                'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+            },
+            keyframes: {
+                fadeIn: {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                },
+                slideUp: {
+                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                    '100%': { transform: 'translateY(0)', opacity: '1' },
+                },
+                pulseGlow: {
+                    '0%, 100%': { boxShadow: '0 0 5px rgba(59, 130, 246, 0.5)' },
+                    '50%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.8)' },
+                }
+            }
         },
-        slideUp: {
-          '0%': { transform: 'translateY(20px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-        pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 5px rgba(59, 130, 246, 0.5)' },
-          '50%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.8)' },
-        }
-      }
     },
-  },
-  plugins: [],
+    plugins: [],
 } satisfies Config;

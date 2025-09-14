@@ -59,7 +59,7 @@ export function useGamesWithOdds(): UseGamesWithOddsResult {
         .eq('season_id', currentSeason.id)
         .gte('game_time', new Date().toISOString()) // Only future games
         .order('game_time', { ascending: true })
-        .limit(20); // Limit to next 20 games
+        .limit(16); // Limit to next 20 games
 
       if (gamesError) {
         throw gamesError;

@@ -81,7 +81,7 @@ function getBestOdds(odds: GameWithOdds['odds'], marketType: string, outcomeName
   const marketOdds = odds.filter(o => o.market_type === marketType);
   
   for (const odd of marketOdds) {
-    const outcomes = odd.outcomes as any[];
+    const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
     const outcome = outcomes.find(o => o.name === outcomeName);
     if (outcome) {
       return outcome.price;
@@ -95,7 +95,7 @@ function getSpreadInfo(odds: GameWithOdds['odds'], teamName: string): { team: st
   const spreadOdds = odds.filter(o => o.market_type === 'spreads');
   
   for (const odd of spreadOdds) {
-    const outcomes = odd.outcomes as any[];
+    const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
     const outcome = outcomes.find(o => o.name === teamName);
     if (outcome && outcome.point !== undefined) {
       return {
@@ -113,7 +113,7 @@ function getTotalsInfo(odds: GameWithOdds['odds']): { total: number; overPrice: 
   const totalsOdds = odds.filter(o => o.market_type === 'totals');
   
   for (const odd of totalsOdds) {
-    const outcomes = odd.outcomes as any[];
+    const outcomes = odd.outcomes as Array<{name: string; price: number; point?: number}>;
     const over = outcomes.find(o => o.name === 'Over');
     const under = outcomes.find(o => o.name === 'Under');
     
