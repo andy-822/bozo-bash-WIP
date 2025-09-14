@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*:root {*/
+/*  --background: #1a1b23;*/
+/*  --foreground: #e5e7eb;*/
+/*}*/
+
+/*@media (prefers-color-scheme: dark) {*/
+/*  :root {*/
+/*    --background: #1a1b23;*/
+/*    --foreground: #e5e7eb;*/
+/*  }*/
+/*}*/
+
+:root {
+    --background: #10121A;
+    --foreground: #E5E7EB;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #10121A;
+        --foreground: #E5E7EB;
+    }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2a2d3a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3d4a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4d5a;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Custom button hover effects */
+.btn-primary {
+  @apply bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold;
+  @apply hover:bg-blue-400 hover:shadow-lg hover:shadow-blue-500/25;
+  @apply active:scale-95 transition-all duration-200;
+}
+
+.btn-secondary {
+  @apply bg-slate-700 border border-slate-600 text-gray-200 px-6 py-3 rounded-lg font-semibold;
+  @apply hover:bg-slate-600 hover:shadow-md;
+  @apply active:scale-95 transition-all duration-200;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-300;
+  @apply hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-1;
+}
+
+/* Input styling */
+.input-dark {
+  @apply bg-slate-700 border border-slate-600 text-gray-200 px-4 py-3 rounded-lg;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+  @apply placeholder-gray-500;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply w-full bg-slate-700 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply h-full rounded-full transition-all duration-500 ease-out;
+}
+
+/* Status indicators */
+.status-pending {
+  @apply bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.status-won {
+  @apply bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.status-lost {
+  @apply bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-medium;
+}

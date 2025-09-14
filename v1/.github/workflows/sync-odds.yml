@@ -1,0 +1,36 @@
+name: Sync NFL Odds
+
+on:
+  schedule:
+    # Monday-Wednesday: 9 AM UTC
+    - cron: '0 9 * * 1,2,3'
+    # Thursday-Friday: 9 AM, 5 PM UTC  
+    - cron: '0 9,17 * * 4,5'
+    # Saturday: 9 AM, 2 PM, 8 PM UTC
+    - cron: '0 9,14,20 * * 6'
+    # Sunday: More frequent updates (8 AM, 12 PM, 4 PM, 8 PM, 11 PM, 2 AM UTC)
+    - cron: '0 8,12,16,20,23,2 * * 0'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync-odds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync NFL Odds
+        run: |
+          echo "Syncing NFL odds at $(date)"
+          response=$(curl -s -w "%{http_code}" -L -X POST "${{ secrets.VERCEL_APP_URL }}/api/sync-odds")
+          http_code=${response: -3}
+          response_body=${response%???}
+          
+          echo "Response code: $http_code"
+          echo "Response body: $response_body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Odds sync successful"
+          else
+            echo "❌ Odds sync failed with status $http_code"
+            # Don't exit with error for now to debug
+          fi
