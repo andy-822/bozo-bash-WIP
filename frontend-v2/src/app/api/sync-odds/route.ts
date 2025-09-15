@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 interface OddsApiGame {
   id: string;
@@ -128,7 +128,7 @@ export async function POST() {
   try {
     console.log('Starting NFL odds sync...');
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = supabaseAdmin;
 
     // Fetch games from The Odds API
     const gamesData = await fetchNFLGames();
