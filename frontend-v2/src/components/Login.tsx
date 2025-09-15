@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import {Chrome, Trophy, HandFist} from 'lucide-react';
+import {Chrome} from 'lucide-react';
 import {useUser} from '@/contexts/UserContext';
 import {Button} from '@/components/ui/button';
 

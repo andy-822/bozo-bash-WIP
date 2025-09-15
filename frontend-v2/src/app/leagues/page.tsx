@@ -16,6 +16,10 @@ interface League {
   sports: { name: string };
 }
 
+interface LeagueMembership {
+  leagues: League;
+}
+
 export default function LeaguesPage() {
   const { user, loading, signOut } = useUser();
   const router = useRouter();
@@ -28,7 +32,7 @@ export default function LeaguesPage() {
     if (user) {
       fetchLeagues();
     }
-  }, [user]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -67,7 +71,7 @@ export default function LeaguesPage() {
             sports!inner(name)
           )
         `)
-        .eq('user_id', user?.id);
+        .eq('user_id', user?.id) as { data: LeagueMembership[] | null; error: Error | null };
 
       if (error || adminError) {
         console.error('Error fetching leagues:', { error, adminError });
@@ -166,7 +170,11 @@ export default function LeaguesPage() {
                   </div>
 
                   <div className="mt-4 pt-4 border-t">
-                    <Button size="sm" className="w-full">
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(`/leagues/${league.id}`)}
+                    >
                       View League
                     </Button>
                   </div>

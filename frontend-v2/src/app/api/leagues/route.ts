@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const cookieStore = await cookies();
         const supabase = createServerClient(
@@ -48,14 +48,14 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ leagues: leagues || [] });
 
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
 
 export async function POST(request: NextRequest) {
     try {
-        const { name, description } = await request.json();
+        const { name } = await request.json();
 
         if (!name?.trim()) {
             return NextResponse.json({ error: 'League name is required' }, { status: 400 });
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true, league });
 
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
