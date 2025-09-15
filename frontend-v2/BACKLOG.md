@@ -33,7 +33,11 @@
 - [ ] **League standings/leaderboards** - Real-time standings calculation
 - [ ] **Weekly scoring system** - Points calculation per week
 - [ ] **Streak calculation** - Calculate real win/loss streaks from pick history
+- [ ] **Season-level stats and leaderboards** - Individual seasons track their own stats, picks, and standings
+- [ ] **Season completion rollup** - When season ends, roll season stats up to league-level historical data
 - [ ] **Seasonal stats** - Track stats per season, not just overall
+- [ ] **League historical leaderboards** - Aggregate stats from all completed seasons
+- [ ] **Season vs. League stat views** - Toggle between current season and all-time league stats
 - [ ] **Winnings tracking** - Add monetary tracking if desired
 - [ ] **Advanced filters** - Filter by sport, time period, etc.
 

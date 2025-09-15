@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getCurrentNFLWeek, isGameInCurrentWeek } from '@/lib/nfl-week';
 
 export async function GET(request: NextRequest) {
     try {
@@ -26,7 +27,9 @@ export async function GET(request: NextRequest) {
                 league_id,
                 leagues!inner(
                     id,
-                    admin_id
+                    admin_id,
+                    sport_id,
+                    sports!inner(name)
                 )
             `)
             .eq('id', seasonId)
@@ -55,35 +58,147 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        // Fetch games for this season with team info
-        const { data: games, error: gamesError } = await supabaseAdmin
-            .from('games')
-            .select(`
-                id,
-                season_id,
-                home_team_id,
-                away_team_id,
-                start_time,
-                home_score,
-                away_score,
-                status,
-                home_team:teams!games_home_team_id_fkey(
-                    name,
-                    abbreviation
-                ),
-                away_team:teams!games_away_team_id_fkey(
-                    name,
-                    abbreviation
-                )
-            `)
-            .eq('season_id', seasonId)
-            .order('start_time', { ascending: true });
+        // For NFL leagues, show all current NFL games regardless of which season they're stored in
+        let games;
+        let gamesError;
+
+        if (season.leagues.sports.name === 'American Football' || season.leagues.sports.name === 'NFL') {
+            // Find the current NFL season with games
+            const { data: nflSeasonWithGames, error: nflSeasonError } = await supabaseAdmin
+                .from('seasons')
+                .select(`
+                    id,
+                    games(
+                        id,
+                        season_id,
+                        home_team_id,
+                        away_team_id,
+                        start_time,
+                        home_score,
+                        away_score,
+                        status,
+                        home_team:teams!games_home_team_id_fkey(
+                            name,
+                            abbreviation
+                        ),
+                        away_team:teams!games_away_team_id_fkey(
+                            name,
+                            abbreviation
+                        ),
+                        odds(
+                            id,
+                            sportsbook,
+                            last_update,
+                            moneyline_home,
+                            moneyline_away,
+                            spread_home,
+                            spread_away,
+                            total_over,
+                            total_under
+                        )
+                    )
+                `)
+                .eq('name', '2025 NFL Season')
+                .single();
+
+            if (nflSeasonError || !nflSeasonWithGames) {
+                // Fallback to this season's games if no NFL season found
+                const { data: fallbackGames, error: fallbackError } = await supabaseAdmin
+                    .from('games')
+                    .select(`
+                        id,
+                        season_id,
+                        home_team_id,
+                        away_team_id,
+                        start_time,
+                        home_score,
+                        away_score,
+                        status,
+                        home_team:teams!games_home_team_id_fkey(
+                            name,
+                            abbreviation
+                        ),
+                        away_team:teams!games_away_team_id_fkey(
+                            name,
+                            abbreviation
+                        ),
+                        odds(
+                            id,
+                            sportsbook,
+                            last_update,
+                            moneyline_home,
+                            moneyline_away,
+                            spread_home,
+                            spread_away,
+                            total_over,
+                            total_under
+                        )
+                    `)
+                    .eq('season_id', seasonId)
+                    .order('start_time', { ascending: true });
+
+                games = fallbackGames;
+                gamesError = fallbackError;
+            } else {
+                games = nflSeasonWithGames.games;
+                gamesError = null;
+            }
+        } else {
+            // For non-NFL leagues, show only this season's games
+            const { data: seasonGames, error: seasonGamesError } = await supabaseAdmin
+                .from('games')
+                .select(`
+                    id,
+                    season_id,
+                    home_team_id,
+                    away_team_id,
+                    start_time,
+                    home_score,
+                    away_score,
+                    status,
+                    home_team:teams!games_home_team_id_fkey(
+                        name,
+                        abbreviation
+                    ),
+                    away_team:teams!games_away_team_id_fkey(
+                        name,
+                        abbreviation
+                    ),
+                    odds(
+                        id,
+                        sportsbook,
+                        last_update,
+                        moneyline_home,
+                        moneyline_away,
+                        spread_home,
+                        spread_away,
+                        total_over,
+                        total_under
+                    )
+                `)
+                .eq('season_id', seasonId)
+                .order('start_time', { ascending: true });
+
+            games = seasonGames;
+            gamesError = seasonGamesError;
+        }
 
         if (gamesError) {
             return NextResponse.json({ error: 'Failed to fetch games' }, { status: 500 });
         }
 
-        return NextResponse.json({ games });
+        const currentWeek = getCurrentNFLWeek();
+
+        // Filter games to show current and next week
+        const currentWeekGames = games?.filter(game =>
+            isGameInCurrentWeek(game.start_time)
+        ) || [];
+
+        return NextResponse.json({
+            games: currentWeekGames,
+            currentWeek,
+            totalGames: games?.length || 0
+        });
 
     } catch (err) {
         console.error('API: Unhandled error:', err);

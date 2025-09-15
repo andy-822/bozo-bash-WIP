@@ -30,16 +30,26 @@ async function fetchNFLGames(): Promise<OddsApiGame[]> {
     throw new Error('ODDS_API_KEY environment variable is required');
   }
 
-  const response = await fetch(
-    `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?` +
-    `apiKey=${apiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`
-  );
+  const url = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?` +
+    `apiKey=${apiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
+
+  console.log('Fetching from URL:', url.replace(apiKey, 'API_KEY_HIDDEN'));
+
+  const response = await fetch(url);
+
+  console.log('Response status:', response.status);
+  console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
   if (!response.ok) {
-    throw new Error(`Odds API request failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.log('Error response body:', errorText);
+    throw new Error(`Odds API request failed: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('API returned data with length:', data.length);
+
+  return data;
 }
 
 async function ensureTeamsAndSeason(supabase: typeof supabaseAdmin) {
@@ -159,6 +169,18 @@ export async function POST() {
     // Fetch games from The Odds API
     const gamesData = await fetchNFLGames();
     console.log(`Fetched ${gamesData.length} games from Odds API`);
+
+    if (gamesData.length === 0) {
+      console.log('No games returned from Odds API - may be off-season or between weeks');
+      return NextResponse.json({
+        success: true,
+        message: 'Odds sync endpoint is working',
+        timestamp: new Date().toISOString(),
+        syncedGames: 0,
+        syncedOdds: 0,
+        note: 'No games available from Odds API'
+      });
+    }
 
     // Ensure we have the necessary sport and season records
     const { sportId, seasonId } = await ensureTeamsAndSeason(supabase);

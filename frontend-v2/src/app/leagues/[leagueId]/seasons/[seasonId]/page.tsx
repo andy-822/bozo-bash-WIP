@@ -19,6 +19,18 @@ interface Season {
   };
 }
 
+interface Odds {
+  id: number;
+  sportsbook: string;
+  last_update: string;
+  moneyline_home: number | null;
+  moneyline_away: number | null;
+  spread_home: number | null;
+  spread_away: number | null;
+  total_over: number | null;
+  total_under: number | null;
+}
+
 interface Game {
   id: number;
   season_id: number;
@@ -36,6 +48,7 @@ interface Game {
     name: string;
     abbreviation: string;
   };
+  odds: Odds[];
 }
 
 export default function SeasonPage() {
@@ -47,6 +60,8 @@ export default function SeasonPage() {
 
   const [season, setSeason] = useState<Season | null>(null);
   const [games, setGames] = useState<Game[]>([]);
+  const [currentWeek, setCurrentWeek] = useState<number>(1);
+  const [totalGames, setTotalGames] = useState<number>(0);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,15 +93,17 @@ export default function SeasonPage() {
 
       setSeason(seasonData.season);
 
-      // Fetch games for this season
+      // Fetch games for this season (current week only)
       const gamesResponse = await fetch(`/api/games?season_id=${seasonId}`);
       const gamesData = await gamesResponse.json();
 
       if (!gamesResponse.ok) {
         console.error('Failed to load games:', gamesData.error);
-        setGames([]); // Don't show error for games, just empty list
+        setGames([]);
       } else {
         setGames(gamesData.games || []);
+        setCurrentWeek(gamesData.currentWeek || 1);
+        setTotalGames(gamesData.totalGames || 0);
       }
 
     } catch (error) {
@@ -169,7 +186,10 @@ export default function SeasonPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <GamepadIcon className="h-4 w-4" />
-                  {games.length} game{games.length !== 1 ? 's' : ''}
+                  Weeks {currentWeek}-{currentWeek + 1}: {games.length} game{games.length !== 1 ? 's' : ''}
+                  {totalGames > games.length && (
+                    <span className="text-gray-500">({totalGames} total)</span>
+                  )}
                 </span>
               </div>
             </div>
@@ -181,7 +201,7 @@ export default function SeasonPage() {
           <div className="border rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <GamepadIcon className="h-5 w-5" />
-              Games
+              Week {currentWeek} & {currentWeek + 1} Games
             </h2>
 
             {games.length === 0 ? (
@@ -198,14 +218,17 @@ export default function SeasonPage() {
                   const gameTime = formatGameTime(game.start_time);
                   const isCompleted = game.status === 'completed';
 
+                  // Get the best odds (for now, just use the first available)
+                  const bestOdds = game.odds?.[0];
+
                   return (
                     <div
                       key={game.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      className="p-4 border rounded-lg hover:bg-gray-50"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4">
-                          <div className="text-center min-w-[100px]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-6">
+                          <div className="text-center min-w-[120px]">
                             <div className="font-medium">{game.away_team.name}</div>
                             <div className="text-sm text-gray-500">@</div>
                             <div className="font-medium">{game.home_team.name}</div>
@@ -225,26 +248,68 @@ export default function SeasonPage() {
                             </div>
                           )}
                         </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            game.status === 'completed'
+                              ? 'bg-green-100 text-green-800'
+                              : game.status === 'live'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {game.status === 'completed' ? 'Final' :
+                             game.status === 'live' ? 'Live' : 'Scheduled'}
+                          </span>
+
+                          {!isCompleted && (
+                            <Button size="sm" variant="outline">
+                              Make Pick
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          game.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : game.status === 'live'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {game.status === 'completed' ? 'Final' :
-                           game.status === 'live' ? 'Live' : 'Scheduled'}
-                        </span>
+                      {/* Odds Section */}
+                      {bestOdds && !isCompleted && (
+                        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-100">
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500 mb-1">Spread</div>
+                            <div className="text-sm font-medium">
+                              {bestOdds.spread_home !== null ? (
+                                <>
+                                  {game.home_team.abbreviation} {bestOdds.spread_home > 0 ? '+' : ''}{bestOdds.spread_home}
+                                </>
+                              ) : (
+                                'N/A'
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500 mb-1">Total</div>
+                            <div className="text-sm font-medium">
+                              {bestOdds.total_over !== null ? `O/U ${bestOdds.total_over}` : 'N/A'}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500 mb-1">Moneyline</div>
+                            <div className="text-sm font-medium">
+                              {bestOdds.moneyline_home !== null ? (
+                                <>
+                                  {game.home_team.abbreviation} {bestOdds.moneyline_home > 0 ? '+' : ''}{bestOdds.moneyline_home}
+                                </>
+                              ) : (
+                                'N/A'
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                        {!isCompleted && (
-                          <Button size="sm" variant="outline">
-                            Make Pick
-                          </Button>
-                        )}
-                      </div>
+                      {bestOdds && !isCompleted && (
+                        <div className="text-xs text-gray-400 mt-2">
+                          Odds from {bestOdds.sportsbook} • Updated {new Date(bestOdds.last_update).toLocaleTimeString()}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
