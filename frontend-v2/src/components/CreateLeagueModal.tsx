@@ -17,9 +17,10 @@ import { Label } from '@/components/ui/label';
 interface CreateLeagueModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onLeagueCreated?: () => void;
 }
 
-export default function CreateLeagueModal({ open, onOpenChange }: CreateLeagueModalProps) {
+export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated }: CreateLeagueModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -79,8 +80,8 @@ export default function CreateLeagueModal({ open, onOpenChange }: CreateLeagueMo
       onOpenChange(false);
       setFormData({ name: '', description: '' });
 
-      // You might want to trigger a refresh of the leagues list here
-      // or show a success toast notification
+      // Trigger refresh of leagues list
+      onLeagueCreated?.();
 
     } catch (error) {
       console.error('Error creating league:', error);
