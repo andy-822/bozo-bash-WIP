@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, Edit2, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import CreateSeasonModal from './CreateSeasonModal';
 
 interface Season {
@@ -19,6 +20,7 @@ interface SeasonsManagerProps {
 }
 
 export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProps) {
+  const router = useRouter();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -140,7 +142,8 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
             {seasons.map((season) => (
               <div
                 key={season.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                onClick={() => router.push(`/leagues/${leagueId}/seasons/${season.id}`)}
               >
                 <div className="flex-1">
                   <h3 className="font-medium">{season.name}</h3>
@@ -156,7 +159,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
                 </div>
 
                 {isAdmin && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -169,7 +172,10 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteSeason(season.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSeason(season.id);
+                      }}
                       title="Delete season"
                     >
                       <Trash2 className="h-4 w-4" />

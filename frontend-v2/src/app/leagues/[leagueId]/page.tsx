@@ -151,9 +151,6 @@ export default function LeaguePage() {
 
     return (
   <div className="min-h-screen p-8 flex">
-      <div className="max-w-4xl mx-auto flex ">
-          <p>game odds go here</p>
-      </div>
     <div className="max-w-4xl mx-auto">
       <header className="mb-8">
         <Button

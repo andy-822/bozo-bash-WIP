@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { seasonId: string } }
+    { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
         const supabase = await createServerSupabaseClient();
-        const { seasonId } = params;
+        const { seasonId } = await params;
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -15,8 +16,8 @@ export async function GET(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        // Fetch season with league info
-        const { data: season, error: seasonError } = await supabase
+        // Fetch season with league info using admin client
+        const { data: season, error: seasonError } = await supabaseAdmin
             .from('seasons')
             .select(`
                 *,
@@ -38,7 +39,7 @@ export async function GET(
 
         // If not admin, check if user is a member
         if (!hasAccess) {
-            const { data: membership, error: membershipError } = await supabase
+            const { data: membership, error: membershipError } = await supabaseAdmin
                 .from('league_memberships')
                 .select('user_id')
                 .eq('league_id', season.leagues.id)
@@ -62,12 +63,12 @@ export async function GET(
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { seasonId: string } }
+    { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
         const { name, start_date, end_date } = await request.json();
         const supabase = await createServerSupabaseClient();
-        const { seasonId } = params;
+        const { seasonId } = await params;
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -126,11 +127,11 @@ export async function PUT(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { seasonId: string } }
+    { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
         const supabase = await createServerSupabaseClient();
-        const { seasonId } = params;
+        const { seasonId } = await params;
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
