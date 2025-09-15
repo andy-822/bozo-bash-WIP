@@ -22,7 +22,7 @@ interface LeagueMember {
   profiles: {
     username: string;
     avatar_url?: string;
-  };
+  }[];
 }
 
 export default function LeaguePage() {
@@ -209,10 +209,10 @@ export default function LeaguePage() {
                   {members.map((member) => (
                     <div key={member.user_id} className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        {member.profiles.username.charAt(0).toUpperCase()}
+                        {member.profiles[0]?.username.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium">{member.profiles.username}</p>
+                        <p className="font-medium">{member.profiles[0]?.username}</p>
                         <p className="text-xs text-gray-500">
                           Joined {new Date(member.joined_at).toLocaleDateString()}
                         </p>
