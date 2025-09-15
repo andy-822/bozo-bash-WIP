@@ -2,15 +2,23 @@
 
 import { useUser } from '@/contexts/UserContext';
 import Login from '@/components/Login';
-import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Home() {
-  const { user, loading, signOut } = useUser();
+  const { user, loading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/leagues');
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
       </div>
     );
   }
@@ -19,23 +27,6 @@ export default function Home() {
     return <Login />;
   }
 
-  return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">The Bozos Parlay Challenge</h1>
-          <div className="flex items-center gap-4">
-            <span>Welcome, {user.email}</span>
-            <Button onClick={signOut} variant="outline">
-              Sign Out
-            </Button>
-          </div>
-        </header>
-
-        <main>
-          <p className="text-gray-400">You&apos;re successfully logged in! Time to start building your parlay challenge features.</p>
-        </main>
-      </div>
-    </div>
-  );
+  // This shouldn't render since we redirect above, but just in case
+  return null;
 }
