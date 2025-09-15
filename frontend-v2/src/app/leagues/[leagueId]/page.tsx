@@ -54,7 +54,7 @@ export default function LeaguePage() {
       setError(null);
 
       // Fetch league details
-      const { data: leagueData, error: leagueError } = await supabase
+      const { data: rawLeagueData, error: leagueError } = await supabase
         .from('leagues')
         .select(`
           id,
@@ -71,6 +71,12 @@ export default function LeaguePage() {
         setError('League not found');
         return;
       }
+
+      // Transform the data to match our interface
+      const leagueData: League = {
+        ...rawLeagueData,
+        sports: Array.isArray(rawLeagueData.sports) ? rawLeagueData.sports[0] || null : rawLeagueData.sports
+      };
 
       setLeague(leagueData);
 

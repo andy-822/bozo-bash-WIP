@@ -45,7 +45,22 @@ export async function GET() {
 
         // Combine both types of leagues
         const memberLeaguesData = memberLeagues?.map(membership => membership.leagues).filter(Boolean) || [];
-        const allLeagues = [...memberLeaguesData, ...(adminLeagues || [])];
+        const adminLeaguesData = adminLeagues || [];
+
+        // Type assertion to ensure consistent structure
+        type LeagueData = {
+            id: number;
+            name: string;
+            created_at: string;
+            admin_id: string;
+            sport_id: number;
+            sports: { name: string }[] | null;
+        };
+
+        const allLeagues: LeagueData[] = [
+            ...(memberLeaguesData.flat() as LeagueData[]),
+            ...(adminLeaguesData as LeagueData[])
+        ];
 
         // Remove duplicates by ID (in case user is both admin and member)
         const uniqueLeagues = allLeagues.filter((league, index, arr) =>
