@@ -1,35 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 export async function GET() {
     try {
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() {
-                        return cookieStore.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        );
-                    },
-                },
-            }
-        );
+        const supabase = await createServerSupabaseClient();
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-        if (!session) {
+        if (userError || !user) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
         // Fetch leagues where user is a member
-        const { data: leagues, error } = await supabase
+        const { data: memberLeagues, error: memberError } = await supabase
+            .from('league_memberships')
+            .select(`
+                leagues!inner(
+                    id,
+                    name,
+                    created_at,
+                    admin_id,
+                    sport_id,
+                    sports(name)
+                )
+            `)
+            .eq('user_id', user.id);
+
+        // Fetch leagues where user is admin
+        const { data: adminLeagues, error: adminError } = await supabase
             .from('leagues')
             .select(`
                 id,
@@ -37,18 +35,27 @@ export async function GET() {
                 created_at,
                 admin_id,
                 sport_id,
-                sports!inner(name)
+                sports(name)
             `)
-            .eq('league_memberships.user_id', session.user.id)
-            .order('created_at', { ascending: false });
+            .eq('admin_id', user.id);
 
-        if (error) {
+        if (memberError || adminError) {
             return NextResponse.json({ error: 'Failed to fetch leagues' }, { status: 500 });
         }
 
-        return NextResponse.json({ leagues: leagues || [] });
+        // Combine both types of leagues
+        const memberLeaguesData = memberLeagues?.map(membership => membership.leagues).filter(Boolean) || [];
+        const allLeagues = [...memberLeaguesData, ...(adminLeagues || [])];
 
-    } catch {
+        // Remove duplicates by ID (in case user is both admin and member)
+        const uniqueLeagues = allLeagues.filter((league, index, arr) =>
+            arr.findIndex(l => l.id === league.id) === index
+        );
+
+        return NextResponse.json({ leagues: uniqueLeagues });
+
+    } catch (err) {
+        console.error('API: Unhandled error:', err);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
@@ -61,31 +68,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'League name is required' }, { status: 400 });
         }
 
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() {
-                        return cookieStore.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        );
-                    },
-                },
-            }
-        );
+        const supabase = await createServerSupabaseClient();
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-        if (!session) {
+        if (userError || !user) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        const user = session.user;
+        // user is already available from getUser() call above
 
         // Create the league
         const { data: league, error: createError } = await supabase

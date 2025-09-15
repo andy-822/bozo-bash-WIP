@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { useUser } from '@/contexts/UserContext';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ interface CreateLeagueModalProps {
 }
 
 export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated }: CreateLeagueModalProps) {
+  const { user } = useUser();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -39,42 +40,28 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
     setIsLoading(true);
 
     try {
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.user) {
+      if (!user) {
         throw new Error('No authentication found');
       }
 
-      // Create league directly with Supabase client
-      const { data: league, error: createError } = await supabase
-        .from('leagues')
-        .insert({
+      // Use the API route instead of direct database calls
+      const response = await fetch('/api/leagues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: formData.name.trim(),
-          admin_id: session.user.id,
-          sport_id: 1, // American Football
-        })
-        .select()
-        .single();
+        }),
+      });
 
-      if (createError) {
-        throw new Error(createError.message || 'Failed to create league');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create league');
       }
 
-      // Add creator as member
-      const { error: memberError } = await supabase
-        .from('league_memberships')
-        .insert({
-          league_id: league.id,
-          user_id: session.user.id,
-        });
-
-      if (memberError) {
-        console.warn('Failed to add creator as member:', memberError);
-        // League was created successfully, membership is optional
-      }
-
-      console.log('League created successfully:', league);
+      console.log('League created successfully:', data.league);
 
       // Close modal and reset form
       onOpenChange(false);

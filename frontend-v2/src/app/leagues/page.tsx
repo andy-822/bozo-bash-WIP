@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import CreateLeagueModal from '@/components/CreateLeagueModal';
-import { supabase } from '@/lib/supabase';
 
 interface League {
   id: number;
@@ -13,11 +12,7 @@ interface League {
   created_at: string;
   admin_id: string;
   sport_id: number;
-  sports: { name: string };
-}
-
-interface LeagueMembership {
-  leagues: League;
+  sports: { name: string }[];
 }
 
 export default function LeaguesPage() {
@@ -26,13 +21,14 @@ export default function LeaguesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [leaguesLoading, setLeaguesLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch leagues when user is available
   useEffect(() => {
     if (user) {
       fetchLeagues();
     }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -44,52 +40,20 @@ export default function LeaguesPage() {
   const fetchLeagues = async () => {
     try {
       setLeaguesLoading(true);
+      setError(null);
 
-      // Get leagues where user is admin (creator)
-      const { data: adminLeagues, error: adminError } = await supabase
-        .from('leagues')
-        .select(`
-          id,
-          name,
-          created_at,
-          admin_id,
-          sport_id,
-          sports!inner(name)
-        `)
-        .eq('admin_id', user?.id);
+      const response = await fetch('/api/leagues');
+      const data = await response.json();
 
-      // Get leagues where user is a member
-      const { data, error } = await supabase
-        .from('league_memberships')
-        .select(`
-          leagues!inner(
-            id,
-            name,
-            created_at,
-            admin_id,
-            sport_id,
-            sports!inner(name)
-          )
-        `)
-        .eq('user_id', user?.id) as { data: LeagueMembership[] | null; error: Error | null };
-
-      if (error || adminError) {
-        console.error('Error fetching leagues:', { error, adminError });
+      if (!response.ok) {
+        setError(data.error || 'Failed to fetch leagues');
         return;
       }
 
-      // Combine admin leagues and member leagues
-      const memberLeagues = data?.map(membership => membership.leagues).filter(Boolean) || [];
-      const allLeagues = [...(adminLeagues || []), ...memberLeagues];
-
-      // Remove duplicates by ID
-      const uniqueLeagues = allLeagues.filter((league, index, arr) =>
-        arr.findIndex(l => l.id === league.id) === index
-      );
-
-      setLeagues(uniqueLeagues as League[]);
+      setLeagues(data.leagues || []);
     } catch (error) {
       console.error('Error fetching leagues:', error);
+      setError('Failed to load leagues');
     } finally {
       setLeaguesLoading(false);
     }
@@ -140,6 +104,12 @@ export default function LeaguesPage() {
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
             </div>
+          ) : error ? (
+            <div className="text-center py-12 border-2 border-red-200 rounded-lg bg-red-50">
+              <h3 className="text-lg font-medium mb-2 text-red-800">Error</h3>
+              <p className="text-red-600 mb-6">{error}</p>
+              <Button onClick={fetchLeagues} variant="outline">Try Again</Button>
+            </div>
           ) : leagues.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
               <h3 className="text-lg font-medium mb-2">No leagues yet</h3>
@@ -165,7 +135,7 @@ export default function LeaguesPage() {
                   </div>
 
                   <div className="text-sm text-gray-600 space-y-1">
-                    <p>Sport: {league.sports.name}</p>
+                    <p>Sport: {league.sports?.[0]?.name || 'Unknown'}</p>
                     <p>Created: {new Date(league.created_at).toLocaleDateString()}</p>
                   </div>
 

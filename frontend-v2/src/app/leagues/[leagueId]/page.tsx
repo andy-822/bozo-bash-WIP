@@ -13,7 +13,7 @@ interface League {
   created_at: string;
   admin_id: string;
   sport_id: number;
-  sports: { name: string }[];
+  sports: { name: string } | null;
 }
 
 interface LeagueMember {
@@ -46,7 +46,7 @@ export default function LeaguePage() {
     if (user && leagueId) {
       fetchLeagueData();
     }
-  }, [user, leagueId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, leagueId]);
 
   const fetchLeagueData = async () => {
     try {
@@ -62,7 +62,7 @@ export default function LeaguePage() {
           created_at,
           admin_id,
           sport_id,
-          sports!inner(name)
+          sports(name)
         `)
         .eq('id', leagueId)
         .single();
@@ -155,7 +155,7 @@ export default function LeaguePage() {
               <div className="flex items-center gap-4 text-gray-600">
                 <span className="flex items-center gap-1">
                   <Trophy className="h-4 w-4" />
-                  {league.sports[0]?.name}
+                  {league.sports?.name || 'Unknown'}
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
