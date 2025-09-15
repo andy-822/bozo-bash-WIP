@@ -13,7 +13,7 @@ interface League {
   created_at: string;
   admin_id: string;
   sport_id: number;
-  sports: { name: string };
+  sports: { name: string }[];
 }
 
 interface LeagueMember {
@@ -155,7 +155,7 @@ export default function LeaguePage() {
               <div className="flex items-center gap-4 text-gray-600">
                 <span className="flex items-center gap-1">
                   <Trophy className="h-4 w-4" />
-                  {league.sports.name}
+                  {league.sports[0]?.name}
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
