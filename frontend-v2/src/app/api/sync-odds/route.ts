@@ -42,14 +42,15 @@ async function fetchNFLGames(): Promise<OddsApiGame[]> {
   return response.json();
 }
 
-async function ensureTeamsAndSeason(supabase: any) {
+async function ensureTeamsAndSeason(supabase: typeof supabaseAdmin) {
   // Ensure we have an NFL sport
-  let { data: nflSport, error: sportError } = await supabase
+  const { data: nflSport, error: sportError } = await supabase
     .from('sports')
     .select('id')
     .eq('name', 'NFL')
     .single();
 
+  let finalNflSport = nflSport;
   if (sportError || !nflSport) {
     const { data: newSport, error: createSportError } = await supabase
       .from('sports')
@@ -60,27 +61,52 @@ async function ensureTeamsAndSeason(supabase: any) {
     if (createSportError) {
       throw new Error(`Failed to create NFL sport: ${createSportError.message}`);
     }
-    nflSport = newSport;
+    finalNflSport = newSport;
+  }
+
+  // Find any existing league for NFL to use for seasons
+  // If none exists, we'll use the first available league (this is for system sync)
+  const { data: availableLeague, error: leagueSearchError } = await supabase
+    .from('leagues')
+    .select('id')
+    .eq('sport_id', finalNflSport.id)
+    .limit(1)
+    .single();
+
+  let leagueId = availableLeague?.id;
+
+  if (leagueSearchError || !availableLeague) {
+    // If no leagues exist for NFL, we need to find any league to use as a placeholder
+    // This is not ideal but works around the foreign key constraint
+    const { data: anyLeague, error: anyLeagueError } = await supabase
+      .from('leagues')
+      .select('id')
+      .limit(1)
+      .single();
+
+    if (anyLeagueError || !anyLeague) {
+      throw new Error('No leagues exist in the system. Please create at least one league first.');
+    }
+    leagueId = anyLeague.id;
   }
 
   // Ensure we have a current season
   const currentYear = new Date().getFullYear();
   const seasonName = `${currentYear} NFL Season`;
 
-  let { data: season, error: seasonError } = await supabase
+  const { data: season, error: seasonError } = await supabase
     .from('seasons')
     .select('id')
     .eq('name', seasonName)
     .single();
 
+  let finalSeason = season;
   if (seasonError || !season) {
-    // Note: This assumes you have a leagues table entry. You might need to adjust this
-    // For now, we'll create a season without a league_id (you may need to adjust your schema)
     const { data: newSeason, error: createSeasonError } = await supabase
       .from('seasons')
       .insert({
         name: seasonName,
-        league_id: 1, // You'll need to adjust this based on your data
+        league_id: leagueId,
         start_date: `${currentYear}-09-01`,
         end_date: `${currentYear + 1}-02-28`
       })
@@ -90,14 +116,14 @@ async function ensureTeamsAndSeason(supabase: any) {
     if (createSeasonError) {
       throw new Error(`Failed to create season: ${createSeasonError.message}`);
     }
-    season = newSeason;
+    finalSeason = newSeason;
   }
 
-  return { sportId: nflSport.id, seasonId: season.id };
+  return { sportId: finalNflSport!.id, seasonId: finalSeason!.id };
 }
 
-async function ensureTeam(supabase: any, teamName: string, sportId: number) {
-  let { data: team, error } = await supabase
+async function ensureTeam(supabase: typeof supabaseAdmin, teamName: string, sportId: number) {
+  const { data: team, error } = await supabase
     .from('teams')
     .select('id')
     .eq('name', teamName)
@@ -118,7 +144,7 @@ async function ensureTeam(supabase: any, teamName: string, sportId: number) {
     if (createError) {
       throw new Error(`Failed to create team ${teamName}: ${createError.message}`);
     }
-    team = newTeam;
+    return newTeam.id;
   }
 
   return team.id;
@@ -147,7 +173,7 @@ export async function POST() {
         const awayTeamId = await ensureTeam(supabase, gameData.away_team, sportId);
 
         // Check if game already exists
-        let { data: existingGame, error: gameCheckError } = await supabase
+        const { data: existingGame, error: gameCheckError } = await supabase
           .from('games')
           .select('id')
           .eq('season_id', seasonId)

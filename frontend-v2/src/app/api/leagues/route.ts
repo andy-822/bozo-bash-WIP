@@ -77,10 +77,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
-        const { name } = await request.json();
+        const { name, sport_id } = await request.json();
 
         if (!name?.trim()) {
             return NextResponse.json({ error: 'League name is required' }, { status: 400 });
+        }
+
+        if (!sport_id) {
+            return NextResponse.json({ error: 'Sport is required' }, { status: 400 });
         }
 
         const supabase = await createServerSupabaseClient();
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 name: name.trim(),
                 admin_id: user.id,
-                sport_id: 1, // American Football
+                sport_id: sport_id,
             })
             .select()
             .single();

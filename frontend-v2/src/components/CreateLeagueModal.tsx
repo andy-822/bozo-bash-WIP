@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/contexts/UserContext';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/lib/supabase';
 
 interface CreateLeagueModalProps {
   open: boolean;
@@ -20,13 +21,44 @@ interface CreateLeagueModalProps {
   onLeagueCreated?: () => void;
 }
 
+interface Sport {
+  id: number;
+  name: string;
+}
+
 export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated }: CreateLeagueModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
+    sport_id: '',
   });
+  const [sports, setSports] = useState<Sport[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sportsLoading, setSportsLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      fetchSports();
+    }
+  }, [open]);
+
+  const fetchSports = async () => {
+    setSportsLoading(true);
+
+    // For now, just use the known sports from the database
+    const knownSports = [
+      { id: 1, name: 'American Football' },
+      { id: 2, name: 'Hockey' },
+      { id: 5, name: 'NFL' }
+    ];
+
+    setSports(knownSports);
+
+    // Auto-select American Football (id: 1) since that's what we use for football
+    setFormData(prev => ({ ...prev, sport_id: '1' }));
+
+    setSportsLoading(false);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -52,6 +84,7 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
         },
         body: JSON.stringify({
           name: formData.name.trim(),
+          sport_id: parseInt(formData.sport_id),
         }),
       });
 
@@ -61,18 +94,15 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
         throw new Error(data.error || 'Failed to create league');
       }
 
-      console.log('League created successfully:', data.league);
 
       // Close modal and reset form
       onOpenChange(false);
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', sport_id: '' });
 
       // Trigger refresh of leagues list
       onLeagueCreated?.();
 
     } catch (error) {
-      console.error('Error creating league:', error);
-      // You might want to show an error toast here
       alert(error instanceof Error ? error.message : 'Failed to create league');
     } finally {
       setIsLoading(false);
@@ -81,7 +111,7 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
 
   const handleClose = () => {
     onOpenChange(false);
-    setFormData({ name: '', description: '' });
+    setFormData({ name: '', sport_id: '' });
   };
 
   return (
@@ -111,16 +141,30 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">
-                Description
+              <Label htmlFor="sport_id" className="text-right">
+                Sport
               </Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Weekly parlay challenge"
-                className="col-span-3"
-              />
+              {sportsLoading ? (
+                <div className="col-span-3 flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                  Loading sports...
+                </div>
+              ) : (
+                <select
+                  id="sport_id"
+                  value={formData.sport_id}
+                  onChange={(e) => handleInputChange('sport_id', e.target.value)}
+                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="">Select a sport</option>
+                  {sports.map((sport) => (
+                    <option key={sport.id} value={sport.id}>
+                      {sport.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -128,7 +172,7 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !formData.name.trim()}>
+            <Button type="submit" disabled={isLoading || !formData.name.trim() || !formData.sport_id}>
               {isLoading ? 'Creating...' : 'Create League'}
             </Button>
           </DialogFooter>
