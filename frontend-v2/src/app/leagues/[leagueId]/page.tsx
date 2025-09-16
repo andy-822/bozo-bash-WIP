@@ -6,17 +6,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Users, Calendar, Trophy } from 'lucide-react';
-import {
-    Sheet,
-    SheetTitle,
-    SheetTrigger,
-    SheetHeader,
-    SheetDescription,
-    SheetClose,
-    SheetContent
-} from "@/components/ui/sheet";
 import SeasonsManager from '@/components/SeasonsManager';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
+import InviteModal from '@/components/InviteModal';
 
 interface League {
   id: number;
@@ -46,6 +38,7 @@ export default function LeaguePage() {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,7 +50,7 @@ export default function LeaguePage() {
     if (user && leagueId) {
       fetchLeagueData();
     }
-  }, [user, leagueId]);
+  }, [user, leagueId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchLeagueData = async () => {
     try {
@@ -245,7 +238,12 @@ export default function LeaguePage() {
               <Button className="w-full" size="sm">
                 Make Picks
               </Button>
-              <Button variant="outline" className="w-full" size="sm">
+              <Button
+                variant="outline"
+                className="w-full"
+                size="sm"
+                onClick={() => setShowInviteModal(true)}
+              >
                 Invite Friends
               </Button>
               {isAdmin && (
@@ -258,6 +256,14 @@ export default function LeaguePage() {
         </div>
       </div>
     </div>
+
+    <InviteModal
+      open={showInviteModal}
+      onOpenChange={setShowInviteModal}
+      leagueId={leagueId}
+      leagueName={league.name}
+      onMemberAdded={fetchLeagueData}
+    />
   </div>
 );
 

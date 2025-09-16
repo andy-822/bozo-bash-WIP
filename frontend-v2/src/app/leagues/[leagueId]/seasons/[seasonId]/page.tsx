@@ -94,7 +94,7 @@ export default function SeasonPage() {
     if (user && seasonId) {
       fetchSeasonData();
     }
-  }, [user, seasonId]);
+  }, [user, seasonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSeasonData = async () => {
     try {

@@ -94,7 +94,8 @@ export async function PUT(
             return NextResponse.json({ error: 'Season not found' }, { status: 404 });
         }
 
-        if (season.leagues.admin_id !== user.id) {
+        const league = Array.isArray(season.leagues) ? season.leagues[0] : season.leagues;
+        if (league.admin_id !== user.id) {
             return NextResponse.json({ error: 'Only league admin can update seasons' }, { status: 403 });
         }
 
@@ -153,7 +154,8 @@ export async function DELETE(
             return NextResponse.json({ error: 'Season not found' }, { status: 404 });
         }
 
-        if (season.leagues.admin_id !== user.id) {
+        const league = Array.isArray(season.leagues) ? season.leagues[0] : season.leagues;
+        if (league.admin_id !== user.id) {
             return NextResponse.json({ error: 'Only league admin can delete seasons' }, { status: 403 });
         }
 

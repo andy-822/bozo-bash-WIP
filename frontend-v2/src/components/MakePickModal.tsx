@@ -175,13 +175,15 @@ export default function MakePickModal({
                     className="h-auto p-4 flex flex-col"
                     onClick={() => {
                       setSelectedBetType('spread');
-                      setSelectedTeam(`${game.away_team.name} ${odds.spread_away > 0 ? '+' : ''}${odds.spread_away}`);
+                      if (odds.spread_away !== null) {
+                        setSelectedTeam(`${game.away_team.name} ${odds.spread_away > 0 ? '+' : ''}${odds.spread_away}`);
+                      }
                     }}
                     disabled={!odds.spread_away}
                   >
                     <div className="font-medium">{game.away_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {odds.spread_away > 0 ? '+' : ''}{odds.spread_away}
+                      {odds.spread_away !== null ? `${odds.spread_away > 0 ? '+' : ''}${odds.spread_away}` : 'N/A'}
                     </div>
                   </Button>
                   <Button
@@ -189,13 +191,15 @@ export default function MakePickModal({
                     className="h-auto p-4 flex flex-col"
                     onClick={() => {
                       setSelectedBetType('spread');
-                      setSelectedTeam(`${game.home_team.name} ${odds.spread_home > 0 ? '+' : ''}${odds.spread_home}`);
+                      if (odds.spread_home !== null) {
+                        setSelectedTeam(`${game.home_team.name} ${odds.spread_home > 0 ? '+' : ''}${odds.spread_home}`);
+                      }
                     }}
                     disabled={!odds.spread_home}
                   >
                     <div className="font-medium">{game.home_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {odds.spread_home > 0 ? '+' : ''}{odds.spread_home}
+                      {odds.spread_home !== null ? `${odds.spread_home > 0 ? '+' : ''}${odds.spread_home}` : 'N/A'}
                     </div>
                   </Button>
                 </div>

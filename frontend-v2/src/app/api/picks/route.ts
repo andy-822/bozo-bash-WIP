@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getCurrentNFLWeek } from '@/lib/nfl-week';
 
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createServerSupabaseClient();
         const { searchParams } = new URL(request.url);
         const week = searchParams.get('week');
-        const seasonId = searchParams.get('season_id');
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -51,11 +49,8 @@ export async function GET(request: NextRequest) {
         // If week is specified, filter picks to that week
         let filteredPicks = picks || [];
         if (week) {
-            const weekNum = parseInt(week);
-            const currentWeek = getCurrentNFLWeek();
-
             // Simple filtering - in production you'd want better week tracking
-            filteredPicks = picks?.filter(pick => {
+            filteredPicks = picks?.filter(() => {
                 // This is a simplified check - you might want to store week number on picks
                 return true; // For now, return all picks
             }) || [];
@@ -71,7 +66,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const { game_id, bet_type, selection, week } = await request.json();
+        const { game_id, bet_type, selection } = await request.json();
         const supabase = await createServerSupabaseClient();
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -111,11 +106,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Check for existing pick this week - delete if exists (overwrite behavior)
-        const currentWeek = week || getCurrentNFLWeek();
 
         // For simplicity, we'll find any recent pick by this user and delete it
         // In production, you might want to store the week number on picks for better tracking
-        const { data: existingPicks, error: existingPicksError } = await supabaseAdmin
+        const { data: existingPicks } = await supabaseAdmin
             .from('picks')
             .select('id')
             .eq('user_id', user.id)

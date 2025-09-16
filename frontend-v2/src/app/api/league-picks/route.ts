@@ -115,7 +115,8 @@ export async function GET(request: NextRequest) {
             result: pick.result,
             created_at: pick.created_at,
             user: {
-                username: Array.isArray(pick.profiles) ? pick.profiles[0]?.username : pick.profiles?.username
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                username: Array.isArray(pick.profiles) ? pick.profiles[0]?.username : (pick.profiles as any)?.username
             },
             games: pick.games
         })) || [];

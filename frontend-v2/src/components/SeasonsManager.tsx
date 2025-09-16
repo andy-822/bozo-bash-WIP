@@ -48,7 +48,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
 
   useEffect(() => {
     fetchSeasons();
-  }, [leagueId]);
+  }, [leagueId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSeasonCreated = () => {
     fetchSeasons();

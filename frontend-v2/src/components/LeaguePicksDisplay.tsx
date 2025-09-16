@@ -34,7 +34,7 @@ export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: League
 
   useEffect(() => {
     fetchLeaguePicks();
-  }, [leagueId, currentWeek]);
+  }, [leagueId, currentWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchLeaguePicks = async () => {
     try {

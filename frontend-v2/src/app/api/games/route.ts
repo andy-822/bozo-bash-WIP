@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if user has access to this league
-        let hasAccess = season.leagues.admin_id === user.id;
+        const league = Array.isArray(season.leagues) ? season.leagues[0] : season.leagues;
+        let hasAccess = league.admin_id === user.id;
 
         // If not admin, check if user is a member
         if (!hasAccess) {
@@ -62,7 +63,8 @@ export async function GET(request: NextRequest) {
         let games;
         let gamesError;
 
-        if (season.leagues.sports.name === 'American Football' || season.leagues.sports.name === 'NFL') {
+        const sport = Array.isArray(league.sports) ? league.sports[0] : league.sports;
+        if (sport.name === 'American Football' || sport.name === 'NFL') {
             // Find the current NFL season with games
             const { data: nflSeasonWithGames, error: nflSeasonError } = await supabaseAdmin
                 .from('seasons')

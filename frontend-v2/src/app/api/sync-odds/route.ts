@@ -76,6 +76,10 @@ async function ensureTeamsAndSeason(supabase: typeof supabaseAdmin) {
 
   // Find any existing league for NFL to use for seasons
   // If none exists, we'll use the first available league (this is for system sync)
+  if (!finalNflSport) {
+    throw new Error('NFL sport not found');
+  }
+
   const { data: availableLeague, error: leagueSearchError } = await supabase
     .from('leagues')
     .select('id')
