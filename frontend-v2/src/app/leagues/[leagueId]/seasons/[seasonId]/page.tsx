@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Calendar, GamepadIcon } from 'lucide-react';
+import MakePickModal from '@/components/MakePickModal';
 
 interface Season {
   id: number;
@@ -51,6 +52,21 @@ interface Game {
   odds: Odds[];
 }
 
+interface Pick {
+  id: number;
+  game_id: number;
+  bet_type: string;
+  selection: string;
+  result: string | null;
+  created_at: string;
+  games: {
+    id: number;
+    start_time: string;
+    home_team: { name: string; abbreviation: string };
+    away_team: { name: string; abbreviation: string };
+  };
+}
+
 export default function SeasonPage() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -60,10 +76,13 @@ export default function SeasonPage() {
 
   const [season, setSeason] = useState<Season | null>(null);
   const [games, setGames] = useState<Game[]>([]);
+  const [picks, setPicks] = useState<Pick[]>([]);
   const [currentWeek, setCurrentWeek] = useState<number>(1);
   const [totalGames, setTotalGames] = useState<number>(0);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPickModal, setShowPickModal] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -106,6 +125,17 @@ export default function SeasonPage() {
         setTotalGames(gamesData.totalGames || 0);
       }
 
+      // Fetch user's picks for the current week
+      const picksResponse = await fetch(`/api/picks?week=${gamesData.currentWeek || 1}`);
+      const picksData = await picksResponse.json();
+
+      if (picksResponse.ok) {
+        setPicks(picksData.picks || []);
+      } else {
+        console.error('Failed to load picks:', picksData.error);
+        setPicks([]);
+      }
+
     } catch (error) {
       console.error('Error fetching season data:', error);
       setError('Failed to load season');
@@ -117,6 +147,16 @@ export default function SeasonPage() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not set';
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const handleMakePickClick = (game: Game) => {
+    setSelectedGame(game);
+    setShowPickModal(true);
+  };
+
+  const handlePickSubmitted = () => {
+    // Refresh games to show updated state
+    fetchSeasonData();
   };
 
   const formatGameTime = (dateString: string) => {
@@ -262,7 +302,11 @@ export default function SeasonPage() {
                           </span>
 
                           {!isCompleted && (
-                            <Button size="sm" variant="outline">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMakePickClick(game)}
+                            >
                               Make Pick
                             </Button>
                           )}
@@ -320,10 +364,69 @@ export default function SeasonPage() {
           {/* Upcoming: Picks & Leaderboard sections */}
           <div className="grid gap-6 md:grid-cols-2">
             <div className="border rounded-lg p-6">
-              <h3 className="font-semibold mb-4">My Picks</h3>
-              <p className="text-gray-600 text-sm">
-                Your picks for this season will appear here
-              </p>
+              <h3 className="font-semibold mb-4">My Picks (Week {currentWeek})</h3>
+
+              {picks.length === 0 ? (
+                <p className="text-gray-600 text-sm">
+                  No picks made for Week {currentWeek} yet
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {picks.map((pick) => {
+                    const gameTime = new Date(pick.games.start_time);
+                    const isGameStarted = new Date() >= gameTime;
+
+                    return (
+                      <div
+                        key={pick.id}
+                        className="p-3 border rounded-lg bg-blue-50"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-medium text-sm">
+                            {pick.games.away_team.name} @ {pick.games.home_team.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium text-blue-900">
+                              {pick.bet_type === 'moneyline' && `${pick.selection} to win`}
+                              {pick.bet_type === 'spread' && `${pick.selection}`}
+                              {pick.bet_type === 'total' && `${pick.selection} points`}
+                            </div>
+                            <div className="text-xs text-blue-600 capitalize">
+                              {pick.bet_type}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            {pick.result ? (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                pick.result === 'win'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {pick.result.toUpperCase()}
+                              </span>
+                            ) : isGameStarted ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                PENDING
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="border rounded-lg p-6">
@@ -335,6 +438,14 @@ export default function SeasonPage() {
           </div>
         </div>
       </div>
+
+      <MakePickModal
+        open={showPickModal}
+        onOpenChange={setShowPickModal}
+        game={selectedGame}
+        currentWeek={currentWeek}
+        onPickSubmitted={handlePickSubmitted}
+      />
     </div>
   );
 }
