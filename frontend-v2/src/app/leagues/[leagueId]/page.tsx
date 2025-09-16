@@ -16,6 +16,7 @@ import {
     SheetContent
 } from "@/components/ui/sheet";
 import SeasonsManager from '@/components/SeasonsManager';
+import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 
 interface League {
   id: number;
@@ -194,12 +195,7 @@ export default function LeaguePage() {
         <div className="md:col-span-2 space-y-6">
           <SeasonsManager leagueId={leagueId} isAdmin={isAdmin} />
 
-          <div className="border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">League Activity</h2>
-            <p className="text-gray-600">
-              No games or picks yet. Stay tuned for weekly challenges!
-            </p>
-          </div>
+          <LeaguePicksDisplay leagueId={leagueId} />
 
           <div className="border rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Leaderboard</h2>
