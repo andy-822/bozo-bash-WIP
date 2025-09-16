@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {Chrome} from 'lucide-react';
 import {useUser} from '@/contexts/UserContext';
 import {Button} from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +23,9 @@ export default function Login() {
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4">
+            <div className="absolute top-4 right-4">
+                <ThemeToggle />
+            </div>
             <div className="max-w-md w-full rounded-lg p-8 border">
                 <h1 className="text-2xl font-bold  mb-2">Bozo Bash</h1>
                 <Button

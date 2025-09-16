@@ -9,6 +9,7 @@ import { ArrowLeft, Users, Calendar, Trophy } from 'lucide-react';
 import SeasonsManager from '@/components/SeasonsManager';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import InviteModal from '@/components/InviteModal';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface League {
   id: number;
@@ -175,11 +176,14 @@ export default function LeaguePage() {
             </div>
           </div>
 
-          {isAdmin && (
-            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              Admin
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {isAdmin && (
+              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                Admin
+              </span>
+            )}
+          </div>
         </div>
       </header>
 

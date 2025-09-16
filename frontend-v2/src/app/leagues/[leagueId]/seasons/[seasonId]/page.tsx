@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Calendar, GamepadIcon } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Season {
   id: number;
@@ -233,6 +234,7 @@ export default function SeasonPage() {
                 </span>
               </div>
             </div>
+            <ThemeToggle />
           </div>
         </header>
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import CreateLeagueModal from '@/components/CreateLeagueModal';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface League {
   id: number;
@@ -83,6 +84,7 @@ export default function LeaguesPage() {
           <h1 className="text-2xl font-bold">Leagues</h1>
           <div className="flex items-center gap-4">
             <span>Welcome, {user.email}</span>
+            <ThemeToggle />
             <Button onClick={signOut} variant="outline">
               Sign Out
             </Button>

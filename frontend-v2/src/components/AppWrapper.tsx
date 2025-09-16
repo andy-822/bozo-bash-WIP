@@ -1,11 +1,14 @@
 'use client';
 
 import { UserProvider } from '@/contexts/UserContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 export default function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <UserProvider>
-      {children}
-    </UserProvider>
+    <ThemeProvider>
+      <UserProvider>
+        {children}
+      </UserProvider>
+    </ThemeProvider>
   );
 }
