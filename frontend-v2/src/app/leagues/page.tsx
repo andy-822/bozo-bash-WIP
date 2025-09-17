@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/contexts/UserContext';
+import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,7 +17,7 @@ interface League {
 }
 
 export default function LeaguesPage() {
-  const { user, loading, signOut } = useUser();
+  const { user, loading, signOut } = useUserStore();
   const router = useRouter();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [leagues, setLeagues] = useState<League[]>([]);

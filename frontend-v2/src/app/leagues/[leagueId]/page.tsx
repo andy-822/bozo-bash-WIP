@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/contexts/UserContext';
+import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -29,7 +29,7 @@ interface LeagueMember {
 }
 
 export default function LeaguePage() {
-  const { user, loading } = useUser();
+  const { user, loading } = useUserStore();
   const router = useRouter();
   const params = useParams();
   const leagueId = params.leagueId as string;

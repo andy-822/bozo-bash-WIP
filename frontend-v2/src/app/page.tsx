@@ -1,12 +1,12 @@
 'use client';
 
-import { useUser } from '@/contexts/UserContext';
+import { useUserStore } from '@/stores/userStore';
 import Login from '@/components/Login';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function Home() {
-  const { user, loading } = useUser();
+  const { user, loading } = useUserStore();
   const router = useRouter();
 
   useEffect(() => {

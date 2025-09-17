@@ -2,13 +2,13 @@
 
 import {useState} from 'react';
 import {Chrome} from 'lucide-react';
-import {useUser} from '@/contexts/UserContext';
+import {useUserStore} from '@/stores/userStore';
 import {Button} from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
-    const {signInWithGoogle} = useUser();
+    const signInWithGoogle = useUserStore((state) => state.signInWithGoogle);
 
     const handleGoogleSignIn = async () => {
         setIsLoading(true);

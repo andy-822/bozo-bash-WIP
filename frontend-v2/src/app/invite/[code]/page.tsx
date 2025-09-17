@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/contexts/UserContext';
+import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter, useParams } from 'next/navigation';
@@ -15,7 +15,7 @@ interface League {
 }
 
 export default function InvitePage() {
-  const { user, loading } = useUser();
+  const { user, loading } = useUserStore();
   const router = useRouter();
   const params = useParams();
   const inviteCode = params.code as string;

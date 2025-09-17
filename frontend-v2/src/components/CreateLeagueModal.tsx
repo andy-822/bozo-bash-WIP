@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/contexts/UserContext';
+import { useUserStore } from '@/stores/userStore';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ interface Sport {
 }
 
 export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated }: CreateLeagueModalProps) {
-  const { user } = useUser();
+  const user = useUserStore((state) => state.user);
   const [formData, setFormData] = useState({
     name: '',
     sport_id: '',
