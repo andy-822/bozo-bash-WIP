@@ -33,8 +33,6 @@ async function fetchNFLGames(): Promise<OddsApiGame[]> {
   const url = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?` +
     `apiKey=${apiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
 
-  console.log('Fetching from URL:', url.replace(apiKey, 'API_KEY_HIDDEN'));
-
   const response = await fetch(url);
 
   console.log('Response status:', response.status);

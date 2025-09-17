@@ -30,6 +30,10 @@
 - [ ] **Weekly pick persistence** - Keep completed week picks visible instead of overwriting
 
 ### 📊 Enhanced Leaderboard & Scoring
+- [ ] **User scoring/points system** - Award points to users for correct picks with event-driven architecture and batched processing
+- [ ] **Flexible scoring rules system** - Configurable scoring rules per league (base points, streak bonuses, difficulty multipliers, etc.)
+- [ ] **Scoring database tables** - user_scores, scoring_events, weekly_leaderboards tables with audit trail
+- [ ] **Automated scoring job** - Scheduled processing to award points after games complete (every 30min-2hrs during game days)
 - [ ] **League standings/leaderboards** - Real-time standings calculation
 - [ ] **Weekly scoring system** - Points calculation per week
 - [ ] **Streak calculation** - Calculate real win/loss streaks from pick history

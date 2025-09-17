@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Users, Calendar, Trophy } from 'lucide-react';
 import SeasonsManager from '@/components/SeasonsManager';
-import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import InviteModal from '@/components/InviteModal';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -191,8 +190,6 @@ export default function LeaguePage() {
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
           <SeasonsManager leagueId={leagueId} isAdmin={isAdmin} />
-
-          <LeaguePicksDisplay leagueId={leagueId} />
 
           <div className="border rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Leaderboard</h2>

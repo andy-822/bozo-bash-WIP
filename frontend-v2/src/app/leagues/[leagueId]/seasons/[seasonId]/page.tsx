@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Calendar, GamepadIcon } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 
 interface Season {
   id: number;
@@ -362,6 +363,9 @@ export default function SeasonPage() {
               </div>
             )}
           </div>
+
+          {/* League Picks */}
+          <LeaguePicksDisplay leagueId={leagueId} currentWeek={currentWeek} />
 
           {/* Upcoming: Picks & Leaderboard sections */}
           <div className="grid gap-6 md:grid-cols-2">
