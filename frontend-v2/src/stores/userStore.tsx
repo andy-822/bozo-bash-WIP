@@ -9,10 +9,10 @@ interface UserStore {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  initialize: () => void;
+  initialize: () => () => void;
 }
 
-export const useUserStore = create<UserStore>((set, get) => ({
+export const useUserStore = create<UserStore>((set) => ({
   user: null,
   loading: true,
 

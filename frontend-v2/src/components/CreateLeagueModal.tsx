@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/stores/userStore';
+import { useCreateLeague } from '@/hooks/useLeagues';
 import {
   Dialog,
   DialogContent,
@@ -32,8 +33,9 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
     sport_id: '',
   });
   const [sports, setSports] = useState<Sport[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [sportsLoading, setSportsLoading] = useState(false);
+
+  const createLeagueMutation = useCreateLeague();
 
   useEffect(() => {
     if (open) {
@@ -68,31 +70,17 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+
+    if (!user) {
+      alert('No authentication found');
+      return;
+    }
 
     try {
-      if (!user) {
-        throw new Error('No authentication found');
-      }
-
-      // Use the API route instead of direct database calls
-      const response = await fetch('/api/leagues', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          sport_id: parseInt(formData.sport_id),
-        }),
+      await createLeagueMutation.mutateAsync({
+        name: formData.name.trim(),
+        sport_id: parseInt(formData.sport_id),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create league');
-      }
-
 
       // Close modal and reset form
       onOpenChange(false);
@@ -103,8 +91,6 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
 
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to create league');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -171,8 +157,8 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !formData.name.trim() || !formData.sport_id}>
-              {isLoading ? 'Creating...' : 'Create League'}
+            <Button type="submit" disabled={createLeagueMutation.isPending || !formData.name.trim() || !formData.sport_id}>
+              {createLeagueMutation.isPending ? 'Creating...' : 'Create League'}
             </Button>
           </DialogFooter>
         </form>

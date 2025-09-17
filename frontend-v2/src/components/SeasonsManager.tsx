@@ -1,18 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, Edit2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CreateSeasonModal from './CreateSeasonModal';
+import { useSeasons } from '@/hooks/useSeasons';
+import { useModalStore } from '@/stores/modalStore';
 
-interface Season {
-  id: number;
-  name: string;
-  league_id: number;
-  start_date: string | null;
-  end_date: string | null;
-}
 
 interface SeasonsManagerProps {
   leagueId: string;
@@ -21,37 +15,23 @@ interface SeasonsManagerProps {
 
 export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProps) {
   const router = useRouter();
-  const [seasons, setSeasons] = useState<Season[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchSeasons = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const {
+    data: seasons = [],
+    isLoading: loading,
+    error,
+    refetch: refetchSeasons,
+  } = useSeasons(leagueId);
 
-      const response = await fetch(`/api/seasons?league_id=${leagueId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch seasons');
-      }
-
-      setSeasons(data.seasons || []);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load seasons');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSeasons();
-  }, [leagueId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    createSeasonOpen: showCreateModal,
+    openCreateSeason,
+    closeCreateSeason,
+  } = useModalStore();
 
   const handleSeasonCreated = () => {
-    fetchSeasons();
+    refetchSeasons();
+    closeCreateSeason();
   };
 
   const handleDeleteSeason = async (seasonId: number) => {
@@ -71,7 +51,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
       }
 
       // Refresh seasons list
-      fetchSeasons();
+      refetchSeasons();
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to delete season');
     }
@@ -106,7 +86,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
           </h2>
           {isAdmin && (
             <Button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openCreateSeason(leagueId)}
               size="sm"
               className="flex items-center gap-1"
             >
@@ -118,7 +98,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
 
         {error && (
           <div className="text-red-600 mb-4 p-3 bg-red-50 rounded-md">
-            {error}
+            {error.message}
           </div>
         )}
 
@@ -128,7 +108,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
             <p className="text-gray-600 mb-4">No seasons created yet</p>
             {isAdmin && (
               <Button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => openCreateSeason(leagueId)}
                 variant="outline"
                 className="flex items-center gap-1 mx-auto"
               >
@@ -190,7 +170,7 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
 
       <CreateSeasonModal
         open={showCreateModal}
-        onOpenChange={setShowCreateModal}
+        onOpenChange={closeCreateSeason}
         leagueId={leagueId}
         onSeasonCreated={handleSeasonCreated}
       />

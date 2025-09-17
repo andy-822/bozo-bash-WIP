@@ -1,6 +1,7 @@
 'use client';
 
 import { useUserStore } from '@/stores/userStore';
+import { useNavigationStore } from '@/stores/navigationStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter, useParams } from 'next/navigation';
@@ -25,6 +26,12 @@ export default function InvitePage() {
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const setBreadcrumbs = useNavigationStore((state) => state.setBreadcrumbs);
+
+  useEffect(() => {
+    setBreadcrumbs([{ label: 'Join League' }]);
+  }, [setBreadcrumbs]);
 
   useEffect(() => {
     if (!loading && !user) {

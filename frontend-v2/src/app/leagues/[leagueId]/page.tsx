@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Users, Calendar, Trophy } from 'lucide-react';
+import { Users, Calendar, Trophy } from 'lucide-react';
 import SeasonsManager from '@/components/SeasonsManager';
 import InviteModal from '@/components/InviteModal';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { useModalStore } from '@/stores/modalStore';
+import { useNavigationStore } from '@/stores/navigationStore';
 
 interface League {
   id: number;
@@ -38,7 +39,14 @@ export default function LeaguePage() {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+
+  const {
+    inviteModalOpen: showInviteModal,
+    openInviteModal,
+    closeInviteModal,
+  } = useModalStore();
+
+  const setBreadcrumbs = useNavigationStore((state) => state.setBreadcrumbs);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -83,6 +91,12 @@ export default function LeaguePage() {
       };
 
       setLeague(leagueData);
+
+      // Set breadcrumbs
+      setBreadcrumbs([
+        { label: 'Leagues', href: '/leagues' },
+        { label: leagueData.name }
+      ]);
 
       // Fetch league members
       const { data: membersData, error: membersError } = await supabase
@@ -143,19 +157,9 @@ export default function LeaguePage() {
 
   const isAdmin = league.admin_id === user.id;
 
-    return (
-  <div className="min-h-screen p-8 flex">
-    <div className="max-w-4xl mx-auto">
-      <header className="mb-8">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/leagues')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Leagues
-        </Button>
-
+  return (
+    <div>
+      <div className="mb-6">
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold mb-2">{league.name}</h1>
@@ -176,7 +180,6 @@ export default function LeaguePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             {isAdmin && (
               <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                 Admin
@@ -184,7 +187,7 @@ export default function LeaguePage() {
             )}
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main Content */}
@@ -243,7 +246,7 @@ export default function LeaguePage() {
                 variant="outline"
                 className="w-full"
                 size="sm"
-                onClick={() => setShowInviteModal(true)}
+                onClick={() => openInviteModal(leagueId)}
               >
                 Invite Friends
               </Button>
@@ -256,21 +259,15 @@ export default function LeaguePage() {
           </div>
         </div>
       </div>
+
+      <InviteModal
+        open={showInviteModal}
+        onOpenChange={closeInviteModal}
+        leagueId={leagueId}
+        leagueName={league.name}
+        onMemberAdded={fetchLeagueData}
+      />
     </div>
-
-    <InviteModal
-      open={showInviteModal}
-      onOpenChange={setShowInviteModal}
-      leagueId={leagueId}
-      leagueName={league.name}
-      onMemberAdded={fetchLeagueData}
-    />
-  </div>
-);
-
-
+  );
 }
-
-
-
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useCreatePick } from '@/hooks/usePicks';
 import {
   Dialog,
   DialogContent,
@@ -47,7 +48,8 @@ export default function MakePickModal({
 }: MakePickModalProps) {
   const [selectedBetType, setSelectedBetType] = useState<BetType | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Selection | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createPickMutation = useCreatePick();
 
   if (!game || !game.odds || game.odds.length === 0) {
     return null;
@@ -67,35 +69,19 @@ export default function MakePickModal({
   const handleSubmit = async () => {
     if (!selectedBetType || !selectedTeam) return;
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch('/api/picks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          game_id: game.id,
-          bet_type: selectedBetType,
-          selection: selectedTeam,
-          week: currentWeek,
-        }),
+      await createPickMutation.mutateAsync({
+        game_id: game.id,
+        bet_type: selectedBetType,
+        selection: selectedTeam,
+        week: currentWeek,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit pick');
-      }
 
       handleClose();
       onPickSubmitted?.();
 
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to submit pick');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -262,9 +248,9 @@ export default function MakePickModal({
           {!isPastDeadline && (
             <Button
               onClick={handleSubmit}
-              disabled={!selectedBetType || !selectedTeam || isSubmitting}
+              disabled={!selectedBetType || !selectedTeam || createPickMutation.isPending}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Pick'}
+              {createPickMutation.isPending ? 'Submitting...' : 'Submit Pick'}
             </Button>
           )}
         </DialogFooter>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCreateInvite } from '@/hooks/useInvites';
 import {
     Dialog,
     DialogContent,
@@ -23,11 +24,12 @@ interface InviteModalProps {
 
 export default function InviteModal({ open, onOpenChange, leagueId, leagueName, onMemberAdded }: InviteModalProps) {
     const [email, setEmail] = useState('');
-    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [inviteLink, setInviteLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+
+    const createInviteMutation = useCreateInvite();
 
     const handleEmailInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,67 +39,48 @@ export default function InviteModal({ open, onOpenChange, leagueId, leagueName, 
             return;
         }
 
-        setLoading(true);
         setError(null);
         setSuccess(null);
 
         try {
-            const response = await fetch('/api/league-invites', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    leagueId,
-                    email: email.trim(),
-                }),
+            const data = await createInviteMutation.mutateAsync({
+                league_id: leagueId,
+                email: email.trim(),
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to send invitation');
-            }
-
-            if (data.userExists) {
-                setSuccess(`User successfully added to ${leagueName}!`);
+            if (data.success) {
+                setSuccess(data.message);
+                if (data.invite_link) {
+                    setInviteLink(data.invite_link);
+                }
                 setEmail('');
                 // Refresh the member list if callback provided
                 if (onMemberAdded) {
                     onMemberAdded();
                 }
-            } else {
-                setSuccess(data.message);
-                setInviteLink(data.inviteLink);
             }
 
         } catch (error) {
             console.error('Error sending invitation:', error);
             setError(error instanceof Error ? error.message : 'Failed to send invitation');
-        } finally {
-            setLoading(false);
         }
     };
 
     const generateInviteLink = async () => {
-        setLoading(true);
         setError(null);
 
         try {
-            const response = await fetch(`/api/league-invites?league_id=${leagueId}`);
-            const data = await response.json();
+            const data = await createInviteMutation.mutateAsync({
+                league_id: leagueId,
+            });
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to generate invite link');
+            if (data.invite_link) {
+                setInviteLink(data.invite_link);
             }
-
-            setInviteLink(data.inviteLink);
 
         } catch (error) {
             console.error('Error generating invite link:', error);
             setError(error instanceof Error ? error.message : 'Failed to generate invite link');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -151,8 +134,8 @@ export default function InviteModal({ open, onOpenChange, leagueId, leagueName, 
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
-                            <Button type="submit" disabled={loading} className="w-full">
-                                {loading ? 'Sending...' : 'Send Invitation'}
+                            <Button type="submit" disabled={createInviteMutation.isPending} className="w-full">
+                                {createInviteMutation.isPending ? 'Sending...' : 'Send Invitation'}
                             </Button>
                         </form>
                     </div>
@@ -178,10 +161,10 @@ export default function InviteModal({ open, onOpenChange, leagueId, leagueName, 
                             <Button
                                 variant="outline"
                                 onClick={generateInviteLink}
-                                disabled={loading}
+                                disabled={createInviteMutation.isPending}
                                 className="w-full"
                             >
-                                {loading ? 'Generating...' : 'Generate Invite Link'}
+                                {createInviteMutation.isPending ? 'Generating...' : 'Generate Invite Link'}
                             </Button>
                         ) : (
                             <div className="space-y-3">

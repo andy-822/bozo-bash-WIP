@@ -8,7 +8,7 @@ interface ThemeStore {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
   setTheme: (theme: Theme) => void;
-  initialize: () => void;
+  initialize: () => () => void;
 }
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({

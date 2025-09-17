@@ -1,26 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, User } from 'lucide-react';
-
-interface LeaguePick {
-  id: number;
-  bet_type: string;
-  selection: string;
-  result: string | null;
-  created_at: string;
-  user: {
-    username: string;
-  };
-  games: {
-    id: number;
-    start_time: string;
-    home_team: { name: string; abbreviation: string };
-    away_team: { name: string; abbreviation: string };
-  };
-}
+import { useLeaguePicks, LeaguePick } from '@/hooks/usePicks';
 
 interface LeaguePicksDisplayProps {
   leagueId: string;
@@ -28,34 +11,11 @@ interface LeaguePicksDisplayProps {
 }
 
 export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: LeaguePicksDisplayProps) {
-  const [picks, setPicks] = useState<LeaguePick[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLeaguePicks();
-  }, [leagueId, currentWeek]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchLeaguePicks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/league-picks?league_id=${leagueId}&week=${currentWeek}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch league picks');
-      }
-
-      setPicks(data.picks || []);
-    } catch (error) {
-      console.error('Error fetching league picks:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load picks');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: picks = [],
+    isLoading: loading,
+    error,
+  } = useLeaguePicks(leagueId, currentWeek);
 
   const getStatusBadge = (pick: LeaguePick) => {
     const gameTime = new Date(pick.games.start_time);
@@ -126,7 +86,7 @@ export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: League
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-red-600">{error}</p>
+          <p className="text-red-600">{error.message}</p>
         </CardContent>
       </Card>
     );
@@ -162,7 +122,7 @@ export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: League
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <User className="h-4 w-4" />
-                      {pick.user.username}
+                      {pick.profiles.username}
                     </CardTitle>
                     {getStatusBadge(pick)}
                   </div>

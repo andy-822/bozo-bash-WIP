@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useCreateSeason } from '@/hooks/useSeasons';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,8 @@ export default function CreateSeasonModal({
     start_date: '',
     end_date: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
+
+  const createSeasonMutation = useCreateSeason();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -42,27 +44,14 @@ export default function CreateSeasonModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     try {
-      const response = await fetch('/api/seasons', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          league_id: parseInt(leagueId),
-          start_date: formData.start_date || null,
-          end_date: formData.end_date || null,
-        }),
+      await createSeasonMutation.mutateAsync({
+        name: formData.name.trim(),
+        league_id: leagueId,
+        start_date: formData.start_date || undefined,
+        end_date: formData.end_date || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create season');
-      }
 
       // Close modal and reset form
       onOpenChange(false);
@@ -73,8 +62,6 @@ export default function CreateSeasonModal({
 
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to create season');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -140,8 +127,8 @@ export default function CreateSeasonModal({
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !formData.name.trim()}>
-              {isLoading ? 'Creating...' : 'Create Season'}
+            <Button type="submit" disabled={createSeasonMutation.isPending || !formData.name.trim()}>
+              {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
             </Button>
           </DialogFooter>
         </form>
