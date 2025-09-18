@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId, validateEmail } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,8 +14,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        if (!leagueId || !email) {
-            return NextResponse.json({ error: 'League ID and email are required' }, { status: 400 });
+        // Validate league ID to prevent SQL injection
+        const leagueIdValidation = validateId(leagueId, 'League ID');
+        if (!leagueIdValidation.isValid) {
+            return NextResponse.json({ error: leagueIdValidation.errorMessage }, { status: 400 });
+        }
+
+        // Validate email format
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) {
+            return NextResponse.json({ error: emailValidation.errorMessage }, { status: 400 });
         }
 
         // Verify user is admin of this league
@@ -102,8 +111,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        if (!leagueId) {
-            return NextResponse.json({ error: 'League ID is required' }, { status: 400 });
+        // Validate league ID to prevent SQL injection
+        const leagueIdValidation = validateId(leagueId, 'League ID');
+        if (!leagueIdValidation.isValid) {
+            return NextResponse.json({ error: leagueIdValidation.errorMessage }, { status: 400 });
         }
 
         // Get league info and verify access

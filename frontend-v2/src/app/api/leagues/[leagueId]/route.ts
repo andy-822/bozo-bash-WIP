@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId } from '@/lib/validation';
 
 export async function GET(
     request: NextRequest,
@@ -8,6 +9,13 @@ export async function GET(
 ) {
     try {
         const { leagueId } = await params;
+
+        // Validate league ID to prevent SQL injection
+        const validation = validateId(leagueId, 'League ID');
+        if (!validation.isValid) {
+            return NextResponse.json({ error: validation.errorMessage }, { status: 400 });
+        }
+
         const supabase = await createServerSupabaseClient();
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();

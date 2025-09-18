@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId, validateRequestBody } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
     try {
@@ -75,9 +76,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        // Validate required fields
-        if (!game_id || !bet_type || !selection) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        // Validate game_id to prevent SQL injection
+        const gameIdValidation = validateId(game_id, 'Game ID');
+        if (!gameIdValidation.isValid) {
+            return NextResponse.json({ error: gameIdValidation.errorMessage }, { status: 400 });
+        }
+
+        // Validate bet_type and selection
+        const bodyValidation = validateRequestBody(
+            { bet_type, selection },
+            { bet_type: 'string', selection: 'string' }
+        );
+        if (!bodyValidation.isValid) {
+            return NextResponse.json({ error: bodyValidation.errorMessage }, { status: 400 });
         }
 
         if (!['moneyline', 'spread', 'total'].includes(bet_type)) {

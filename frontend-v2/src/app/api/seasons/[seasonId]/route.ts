@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId } from '@/lib/validation';
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
-        const supabase = await createServerSupabaseClient();
         const { seasonId } = await params;
 
+        // Validate season ID to prevent SQL injection
+        const validation = validateId(seasonId, 'Season ID');
+        if (!validation.isValid) {
+            return NextResponse.json({ error: validation.errorMessage }, { status: 400 });
+        }
+
+        const supabase = await createServerSupabaseClient();
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
@@ -66,9 +73,16 @@ export async function PUT(
     { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
+        const { seasonId } = await params;
+
+        // Validate season ID to prevent SQL injection
+        const validation = validateId(seasonId, 'Season ID');
+        if (!validation.isValid) {
+            return NextResponse.json({ error: validation.errorMessage }, { status: 400 });
+        }
+
         const { name, start_date, end_date } = await request.json();
         const supabase = await createServerSupabaseClient();
-        const { seasonId } = await params;
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -131,8 +145,15 @@ export async function DELETE(
     { params }: { params: Promise<{ seasonId: string }> }
 ) {
     try {
-        const supabase = await createServerSupabaseClient();
         const { seasonId } = await params;
+
+        // Validate season ID to prevent SQL injection
+        const validation = validateId(seasonId, 'Season ID');
+        if (!validation.isValid) {
+            return NextResponse.json({ error: validation.errorMessage }, { status: 400 });
+        }
+
+        const supabase = await createServerSupabaseClient();
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 

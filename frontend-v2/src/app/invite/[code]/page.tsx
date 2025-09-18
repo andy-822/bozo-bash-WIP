@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { UserPlus, Check, X, Trophy, Users } from 'lucide-react';
+import { decodeInviteCode } from '@/lib/validation';
 
 interface League {
   id: number;
@@ -51,14 +52,14 @@ export default function InvitePage() {
       setPageLoading(true);
       setError(null);
 
-      // Decode the invite code to get league ID
-      const decoded = atob(inviteCode);
-      const [leagueId] = decoded.split(':');
-
-      if (!leagueId) {
-        setError('Invalid invite link');
+      // Securely decode and validate the invite code
+      const decoded = decodeInviteCode(inviteCode);
+      if (!decoded.isValid) {
+        setError(decoded.errorMessage || 'Invalid invite link');
         return;
       }
+
+      const leagueId = decoded.leagueId!;
 
       // Fetch league information
       const response = await fetch(`/api/leagues/${leagueId}`);

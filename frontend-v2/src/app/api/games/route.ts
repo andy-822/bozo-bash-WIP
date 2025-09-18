@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCurrentNFLWeek, isGameInCurrentWeek } from '@/lib/nfl-week';
+import { validateId } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,8 +16,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        if (!seasonId) {
-            return NextResponse.json({ error: 'Season ID is required' }, { status: 400 });
+        // Validate season ID to prevent SQL injection
+        const validation = validateId(seasonId, 'Season ID');
+        if (!validation.isValid) {
+            return NextResponse.json({ error: validation.errorMessage }, { status: 400 });
         }
 
         // Verify user has access to this season's league

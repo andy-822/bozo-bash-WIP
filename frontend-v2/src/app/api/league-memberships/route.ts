@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,8 +14,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        if (!league_id) {
-            return NextResponse.json({ error: 'League ID is required' }, { status: 400 });
+        // Validate league ID to prevent SQL injection
+        const leagueIdValidation = validateId(league_id, 'League ID');
+        if (!leagueIdValidation.isValid) {
+            return NextResponse.json({ error: leagueIdValidation.errorMessage }, { status: 400 });
         }
 
         // Check if league exists

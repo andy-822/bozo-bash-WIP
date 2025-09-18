@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateId, validateWeek } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,8 +16,18 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        if (!leagueId) {
-            return NextResponse.json({ error: 'League ID is required' }, { status: 400 });
+        // Validate league ID to prevent SQL injection
+        const leagueValidation = validateId(leagueId, 'League ID');
+        if (!leagueValidation.isValid) {
+            return NextResponse.json({ error: leagueValidation.errorMessage }, { status: 400 });
+        }
+
+        // Validate week if provided
+        if (week) {
+            const weekValidation = validateWeek(week);
+            if (!weekValidation.isValid) {
+                return NextResponse.json({ error: weekValidation.errorMessage }, { status: 400 });
+            }
         }
 
         // Verify user has access to this league (either admin or member)

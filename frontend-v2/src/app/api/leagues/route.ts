@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { validateRequestBody } from '@/lib/validation';
 
 export async function GET() {
     try {
@@ -79,12 +80,13 @@ export async function POST(request: NextRequest) {
     try {
         const { name, sport_id } = await request.json();
 
-        if (!name?.trim()) {
-            return NextResponse.json({ error: 'League name is required' }, { status: 400 });
-        }
-
-        if (!sport_id) {
-            return NextResponse.json({ error: 'Sport is required' }, { status: 400 });
+        // Validate request body to prevent SQL injection
+        const bodyValidation = validateRequestBody(
+            { name, sport_id },
+            { name: 'string', sport_id: 'id' }
+        );
+        if (!bodyValidation.isValid) {
+            return NextResponse.json({ error: bodyValidation.errorMessage }, { status: 400 });
         }
 
         const supabase = await createServerSupabaseClient();
