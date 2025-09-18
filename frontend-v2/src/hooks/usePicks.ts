@@ -30,7 +30,7 @@ export interface LeaguePick {
   selection: string;
   result: string | null;
   created_at: string;
-  profiles: {
+  user: {
     username: string;
   };
   games: {

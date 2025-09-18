@@ -122,7 +122,7 @@ export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: League
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <User className="h-4 w-4" />
-                      {pick.profiles.username}
+                      {pick.user?.username || 'Unknown User'}
                     </CardTitle>
                     {getStatusBadge(pick)}
                   </div>

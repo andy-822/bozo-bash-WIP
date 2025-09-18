@@ -26,8 +26,8 @@ function StoreInitializer({ children }: { children: ReactNode }) {
 
 export default function AppWrapper({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
-    () =>
-      new QueryClient({
+    () => {
+      const client = new QueryClient({
         defaultOptions: {
           queries: {
             staleTime: 1000 * 60 * 5, // 5 minutes
@@ -44,7 +44,25 @@ export default function AppWrapper({ children }: { children: ReactNode }) {
             },
           },
         },
-      })
+      });
+
+      // Debug logging for cache events (development only)
+      if (process.env.NODE_ENV === 'development') {
+        client.getQueryCache().subscribe((event) => {
+          console.log('🔄 TanStack Query Cache Event:', {
+            type: event.type,
+            query: event.query?.queryKey,
+            data: event.query?.state.data ? '✅ Has Data' : '❌ No Data',
+            status: event.query?.state.status,
+          });
+        });
+
+        // Expose query client globally for debugging
+        (window as any).__REACT_QUERY_CLIENT__ = client;
+      }
+
+      return client;
+    }
   );
 
   return (
