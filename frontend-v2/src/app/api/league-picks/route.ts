@@ -82,14 +82,19 @@ export async function GET(request: NextRequest) {
             .select(`
                 id,
                 user_id,
+                game_id,
                 bet_type,
                 selection,
                 result,
+                points_awarded,
+                week,
                 created_at,
                 profiles!inner(username),
                 games!inner(
                     id,
+                    season_id,
                     start_time,
+                    status,
                     home_team:teams!games_home_team_id_fkey(
                         name,
                         abbreviation
@@ -103,13 +108,9 @@ export async function GET(request: NextRequest) {
             .in('user_id', memberIds)
             .order('created_at', { ascending: false });
 
-        // If week is specified, filter by recent picks (simplified approach)
+        // Filter by week if specified
         if (week) {
-            // For now, just get picks from the last 7 days
-            // In production, you might want to store week numbers on picks for better filtering
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            query = query.gte('created_at', weekAgo.toISOString());
+            query = query.eq('week', parseInt(week));
         }
 
         const { data: picks, error: picksError } = await query;
@@ -121,9 +122,13 @@ export async function GET(request: NextRequest) {
         // Transform the data to match our interface
         const transformedPicks = picks?.map(pick => ({
             id: pick.id,
+            user_id: pick.user_id,
+            game_id: pick.game_id,
             bet_type: pick.bet_type,
             selection: pick.selection,
             result: pick.result,
+            points_awarded: pick.points_awarded,
+            week: pick.week,
             created_at: pick.created_at,
             user: {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any

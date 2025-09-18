@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerSupabaseClient();
         const { searchParams } = new URL(request.url);
         const seasonId = searchParams.get('season_id');
+        const week = searchParams.get('week');
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -194,13 +195,21 @@ export async function GET(request: NextRequest) {
 
         const currentWeek = getCurrentNFLWeek();
 
-        // Filter games to show current and next week
-        const currentWeekGames = games?.filter(game =>
-            isGameInCurrentWeek(game.start_time)
-        ) || [];
+        let filteredGames = games || [];
+
+        if (week) {
+            // Filter by specific week - for now, return all games and let frontend handle it
+            // In production, you'd want to add week numbers to games table
+            filteredGames = games || [];
+        } else {
+            // Default: show current week games only
+            filteredGames = games?.filter(game =>
+                isGameInCurrentWeek(game.start_time)
+            ) || [];
+        }
 
         return NextResponse.json({
-            games: currentWeekGames,
+            games: filteredGames,
             currentWeek,
             totalGames: games?.length || 0
         });

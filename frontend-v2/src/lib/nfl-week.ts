@@ -7,10 +7,14 @@ export function getCurrentNFLWeek(): number {
   const now = new Date();
   const currentYear = now.getFullYear();
 
-  // NFL season typically starts the first Tuesday after Labor Day (first Monday of September)
-  // For 2024 season, Week 1 started September 5th
-  // For simplicity, we'll approximate week 1 start as September 5th
-  const seasonStart = new Date(currentYear, 8, 5); // September 5th (month is 0-indexed)
+  // NFL season start dates (Week 1 typically starts first Thursday of September)
+  // 2024: September 5th, 2025: September 4th
+  let seasonStartDay = 5; // Default September 5th
+  if (currentYear === 2025) {
+    seasonStartDay = 4; // September 4th, 2025
+  }
+
+  const seasonStart = new Date(currentYear, 8, seasonStartDay); // September (month is 0-indexed)
 
   // If we're before the season start, we're in preseason or previous season
   if (now < seasonStart) {
@@ -29,7 +33,14 @@ export function getCurrentNFLWeek(): number {
 
 export function getNFLWeekDateRange(week: number, year?: number): { start: Date; end: Date } {
   const currentYear = year || new Date().getFullYear();
-  const seasonStart = new Date(currentYear, 8, 5); // September 5th
+
+  // Use same logic as getCurrentNFLWeek
+  let seasonStartDay = 5; // Default September 5th
+  if (currentYear === 2025) {
+    seasonStartDay = 4; // September 4th, 2025
+  }
+
+  const seasonStart = new Date(currentYear, 8, seasonStartDay);
 
   // Calculate week start (Tuesday)
   const weekStart = new Date(seasonStart);

@@ -92,7 +92,7 @@ export default function Leaderboard({ seasonId, currentWeek = 1, showWeeklyToggl
         </h3>
 
         {showWeeklyToggle && (
-          <div className="flex rounded-md bg-gray-100 p-1">
+          <div className="flex rounded-md p-1">
             <Button
               variant={viewType === 'season' ? 'default' : 'ghost'}
               size="sm"
@@ -140,7 +140,7 @@ export default function Leaderboard({ seasonId, currentWeek = 1, showWeeklyToggl
               key={entry.user_id}
               className={`grid grid-cols-12 gap-4 items-center p-3 rounded-lg transition-colors ${
                 entry.is_current_user
-                  ? 'bg-blue-50 border border-blue-200'
+                  ? 'border border-blue-200'
                   : 'hover:bg-gray-50'
               }`}
             >
@@ -151,7 +151,7 @@ export default function Leaderboard({ seasonId, currentWeek = 1, showWeeklyToggl
 
               {/* Player */}
               <div className="col-span-3 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
                   {entry.avatar_url ? (
                     <img
                       src={entry.avatar_url}

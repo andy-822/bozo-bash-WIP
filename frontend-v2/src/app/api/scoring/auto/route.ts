@@ -1,0 +1,365 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getCurrentNFLWeek } from '@/lib/nfl-week';
+import {
+  fetchESPNScoreboard,
+  processESPNGames,
+  getCompletedGames,
+  logESPNAPICall,
+  type ProcessedGameData,
+} from '@/lib/espn-monitor';
+
+interface DatabaseGame {
+  id: number;
+  espn_game_id: string;
+  status: string;
+  home_team: {
+    abbreviation: string;
+  };
+  away_team: {
+    abbreviation: string;
+  };
+}
+
+interface Pick {
+  id: number;
+  user_id: string;
+  game_id: number;
+  bet_type: string;
+  selection: string;
+  result: string | null;
+  points_awarded: number;
+  week: number;
+}
+
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const currentWeek = getCurrentNFLWeek();
+
+  console.log(`Starting automated scoring for week ${currentWeek}`);
+
+  try {
+    // 1. Fetch ESPN scoreboard data
+    let espnData;
+    let espnError: string | null = null;
+    let responseTimeMs = 0;
+
+    try {
+      espnData = await fetchESPNScoreboard(currentWeek);
+      responseTimeMs = Date.now() - startTime;
+    } catch (error) {
+      responseTimeMs = Date.now() - startTime;
+      espnError = error instanceof Error ? error.message : 'ESPN API fetch failed';
+
+      // Log failed API call
+      await supabaseAdmin.from('espn_api_calls').insert({
+        endpoint: `/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}`,
+        week: currentWeek,
+        status_code: 0,
+        games_found: 0,
+        completed_games: 0,
+        newly_completed: 0,
+        response_time_ms: responseTimeMs,
+        error_message: espnError,
+      });
+
+      return NextResponse.json({
+        error: 'Failed to fetch ESPN data',
+        details: espnError,
+      }, { status: 500 });
+    }
+
+    // 2. Process ESPN games
+    const processedGames = processESPNGames(espnData);
+    const completedGames = getCompletedGames(processedGames);
+
+    console.log(`ESPN data processed: ${processedGames.length} total games, ${completedGames.length} completed`);
+
+    // 3. Find newly completed games (not already scored)
+    const newlyCompletedGames: ProcessedGameData[] = [];
+
+    for (const espnGame of completedGames) {
+      // Check if we already processed this game
+      const { data: existingEvent } = await supabaseAdmin
+        .from('scoring_events')
+        .select('id')
+        .eq('espn_game_id', espnGame.espnGameId)
+        .single();
+
+      if (!existingEvent) {
+        newlyCompletedGames.push(espnGame);
+      }
+    }
+
+    console.log(`Found ${newlyCompletedGames.length} newly completed games to process`);
+
+    // 4. Process each newly completed game
+    let totalPicksProcessed = 0;
+    let totalPointsAwarded = 0;
+    const processedGameIds: string[] = [];
+
+    for (const espnGame of newlyCompletedGames) {
+      try {
+        const result = await processCompletedGame(espnGame);
+        totalPicksProcessed += result.picksProcessed;
+        totalPointsAwarded += result.pointsAwarded;
+        processedGameIds.push(espnGame.espnGameId);
+      } catch (error) {
+        console.error(`Failed to process game ${espnGame.espnGameId}:`, error);
+
+        // Log failed scoring attempt
+        await supabaseAdmin.from('scoring_events').insert({
+          espn_game_id: espnGame.espnGameId,
+          game_id: null,
+          status_before: 'unknown',
+          status_after: 'completed',
+          home_score: espnGame.homeTeam.score,
+          away_score: espnGame.awayTeam.score,
+          picks_processed: 0,
+          points_awarded: 0,
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    // 5. Log successful ESPN API call
+    await supabaseAdmin.from('espn_api_calls').insert({
+      endpoint: `/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}`,
+      week: currentWeek,
+      status_code: 200,
+      games_found: processedGames.length,
+      completed_games: completedGames.length,
+      newly_completed: newlyCompletedGames.length,
+      response_time_ms: responseTimeMs,
+      error_message: null,
+    });
+
+    const totalTime = Date.now() - startTime;
+
+    return NextResponse.json({
+      success: true,
+      week: currentWeek,
+      summary: {
+        totalGames: processedGames.length,
+        completedGames: completedGames.length,
+        newlyCompleted: newlyCompletedGames.length,
+        picksProcessed: totalPicksProcessed,
+        pointsAwarded: totalPointsAwarded,
+        processedGameIds,
+      },
+      timing: {
+        espnResponseTime: responseTimeMs,
+        totalProcessingTime: totalTime,
+      },
+    });
+
+  } catch (error) {
+    console.error('Automated scoring failed:', error);
+
+    return NextResponse.json({
+      error: 'Automated scoring failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    }, { status: 500 });
+  }
+}
+
+/**
+ * Process a single completed game and score all picks
+ */
+async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
+  picksProcessed: number;
+  pointsAwarded: number;
+}> {
+  console.log(`Processing completed game: ${espnGame.homeTeam.abbreviation} vs ${espnGame.awayTeam.abbreviation}`);
+
+  // 1. Find the matching game in our database
+  const { data: dbGame, error: gameError } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id,
+      espn_game_id,
+      status,
+      home_team:teams!games_home_team_id_fkey(abbreviation),
+      away_team:teams!games_away_team_id_fkey(abbreviation)
+    `)
+    .eq('espn_game_id', espnGame.espnGameId)
+    .single();
+
+  if (gameError || !dbGame) {
+    // Try to match by team abbreviations and date if no ESPN ID mapping
+    const gameDate = new Date(espnGame.startTime);
+    const startOfDay = new Date(gameDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(gameDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const { data: dbGameByTeams, error: teamMatchError } = await supabaseAdmin
+      .from('games')
+      .select(`
+        id,
+        espn_game_id,
+        status,
+        start_time,
+        home_team:teams!games_home_team_id_fkey(abbreviation),
+        away_team:teams!games_away_team_id_fkey(abbreviation)
+      `)
+      .gte('start_time', startOfDay.toISOString())
+      .lte('start_time', endOfDay.toISOString())
+      .single();
+
+    if (teamMatchError || !dbGameByTeams) {
+      throw new Error(`Could not find database game for ESPN game ${espnGame.espnGameId}`);
+    }
+
+    // Update the database game with ESPN ID for future lookups
+    await supabaseAdmin
+      .from('games')
+      .update({ espn_game_id: espnGame.espnGameId })
+      .eq('id', dbGameByTeams.id);
+
+    // Use the matched game
+    Object.assign(dbGame, dbGameByTeams);
+  }
+
+  const typedDbGame = dbGame as unknown as DatabaseGame;
+
+  // 2. Update game status and scores in database
+  await supabaseAdmin
+    .from('games')
+    .update({
+      status: 'completed',
+      home_score: espnGame.homeTeam.score,
+      away_score: espnGame.awayTeam.score,
+    })
+    .eq('id', typedDbGame.id);
+
+  // 3. Get all picks for this game
+  const { data: picks, error: picksError } = await supabaseAdmin
+    .from('picks')
+    .select('*')
+    .eq('game_id', typedDbGame.id)
+    .is('result', null); // Only unprocessed picks
+
+  if (picksError) {
+    throw new Error(`Failed to fetch picks for game ${typedDbGame.id}: ${picksError.message}`);
+  }
+
+  if (!picks || picks.length === 0) {
+    console.log(`No picks found for game ${typedDbGame.id}`);
+
+    // Still create scoring event to mark as processed
+    await supabaseAdmin.from('scoring_events').insert({
+      game_id: typedDbGame.id,
+      espn_game_id: espnGame.espnGameId,
+      status_before: typedDbGame.status,
+      status_after: 'completed',
+      home_score: espnGame.homeTeam.score,
+      away_score: espnGame.awayTeam.score,
+      picks_processed: 0,
+      points_awarded: 0,
+    });
+
+    return { picksProcessed: 0, pointsAwarded: 0 };
+  }
+
+  // 4. Score each pick
+  let pointsAwarded = 0;
+  const pickUpdates: Array<{ id: number; result: string; points_awarded: number }> = [];
+
+  for (const pick of picks as Pick[]) {
+    const result = calculatePickResult(pick, espnGame);
+    const points = result === 'win' ? 1 : 0;
+
+    pickUpdates.push({
+      id: pick.id,
+      result,
+      points_awarded: points,
+    });
+
+    if (result === 'win') {
+      pointsAwarded++;
+    }
+  }
+
+  // 5. Update all picks in batch
+  for (const update of pickUpdates) {
+    await supabaseAdmin
+      .from('picks')
+      .update({
+        result: update.result,
+        points_awarded: update.points_awarded,
+      })
+      .eq('id', update.id);
+  }
+
+  // 6. Create scoring event record
+  await supabaseAdmin.from('scoring_events').insert({
+    game_id: typedDbGame.id,
+    espn_game_id: espnGame.espnGameId,
+    status_before: typedDbGame.status,
+    status_after: 'completed',
+    home_score: espnGame.homeTeam.score,
+    away_score: espnGame.awayTeam.score,
+    picks_processed: picks.length,
+    points_awarded: pointsAwarded,
+  });
+
+  console.log(`Scored ${picks.length} picks for game ${typedDbGame.id}, awarded ${pointsAwarded} points`);
+
+  return {
+    picksProcessed: picks.length,
+    pointsAwarded,
+  };
+}
+
+/**
+ * Calculate the result of a pick based on final game scores
+ */
+function calculatePickResult(pick: Pick, game: ProcessedGameData): string {
+  const homeScore = game.homeTeam.score;
+  const awayScore = game.awayTeam.score;
+
+  if (homeScore === null || awayScore === null) {
+    return 'pending';
+  }
+
+  switch (pick.bet_type) {
+    case 'moneyline':
+      const winner = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'tie';
+      if (winner === 'tie') return 'push';
+      return pick.selection === winner ? 'win' : 'loss';
+
+    case 'spread':
+      // Selection format: "home -7.5" or "away +3.5"
+      const [team, spreadStr] = pick.selection.split(' ');
+      const spread = parseFloat(spreadStr);
+
+      if (team === 'home') {
+        const homeAdjusted = homeScore + spread;
+        if (homeAdjusted === awayScore) return 'push';
+        return homeAdjusted > awayScore ? 'win' : 'loss';
+      } else {
+        const awayAdjusted = awayScore + spread;
+        if (awayAdjusted === homeScore) return 'push';
+        return awayAdjusted > homeScore ? 'win' : 'loss';
+      }
+
+    case 'total':
+      // Selection format: "over 47.5" or "under 47.5"
+      const [overUnder, totalStr] = pick.selection.split(' ');
+      const total = parseFloat(totalStr);
+      const gameTotal = homeScore + awayScore;
+
+      if (gameTotal === total) return 'push';
+
+      if (overUnder === 'over') {
+        return gameTotal > total ? 'win' : 'loss';
+      } else {
+        return gameTotal < total ? 'win' : 'loss';
+      }
+
+    default:
+      console.warn(`Unknown bet type: ${pick.bet_type}`);
+      return 'pending';
+  }
+}

@@ -29,16 +29,19 @@ export interface LeaguePick {
   bet_type: string;
   selection: string;
   result: string | null;
+  points_awarded: number;
+  week: number;
   created_at: string;
   user: {
     username: string;
   };
   games: {
     id: number;
+    season_id: number;
     start_time: string;
+    status: string;
     home_team: { name: string; abbreviation: string };
     away_team: { name: string; abbreviation: string };
-    status: string;
   };
 }
 

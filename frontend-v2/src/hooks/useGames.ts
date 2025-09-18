@@ -77,6 +77,35 @@ const fetchGames = async (seasonId: string): Promise<GamesResponse> => {
   };
 };
 
+const fetchGamesForWeek = async (seasonId: string, week: number): Promise<GamesResponse> => {
+  const response = await fetch(`/api/games?season_id=${seasonId}&week=${week}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to load games');
+  }
+
+  // Filter games by week on the frontend for now
+  const currentWeek = data.currentWeek || 1;
+  const allGames = data.games || [];
+
+  // Simple week filtering based on game dates
+  // Calculate week based on season start (approximation)
+  const weekGames = allGames.filter(game => {
+    const gameDate = new Date(game.start_time);
+    const seasonStart = new Date(gameDate.getFullYear(), 8, 5); // Sept 5th
+    const daysSinceStart = Math.floor((gameDate.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));
+    const gameWeek = Math.floor(daysSinceStart / 7) + 1;
+    return gameWeek === week;
+  });
+
+  return {
+    games: weekGames,
+    currentWeek: currentWeek,
+    totalGames: data.totalGames || 0,
+  };
+};
+
 export const useSeason = (seasonId: string) => {
   return useQuery({
     queryKey: ['season', seasonId],
@@ -90,5 +119,13 @@ export const useGames = (seasonId: string) => {
     queryKey: ['games', seasonId],
     queryFn: () => fetchGames(seasonId),
     enabled: !!seasonId,
+  });
+};
+
+export const useGamesForWeek = (seasonId: string, week: number) => {
+  return useQuery({
+    queryKey: ['games', seasonId, 'week', week],
+    queryFn: () => fetchGamesForWeek(seasonId, week),
+    enabled: !!seasonId && !!week,
   });
 };

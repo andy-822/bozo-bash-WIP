@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerSupabaseClient();
         const { searchParams } = new URL(request.url);
         const week = searchParams.get('week');
+        const seasonId = searchParams.get('season_id');
+        const userOnly = searchParams.get('user_only') === 'true';
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -15,7 +17,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        // Build query
+        // Build base query
         let query = supabaseAdmin
             .from('picks')
             .select(`
@@ -24,40 +26,47 @@ export async function GET(request: NextRequest) {
                 bet_type,
                 selection,
                 result,
+                points_awarded,
+                week,
                 created_at,
                 games!inner(
                     id,
+                    season_id,
                     start_time,
                     home_team:teams!games_home_team_id_fkey(name, abbreviation),
                     away_team:teams!games_away_team_id_fkey(name, abbreviation)
                 )
-            `)
-            .eq('user_id', user.id);
+            `);
+
+        // Filter by user if userOnly is true, otherwise show all picks
+        if (userOnly) {
+            query = query.eq('user_id', user.id);
+        }
+
+        // Filter by season if provided
+        if (seasonId) {
+            query = query.eq('games.season_id', seasonId);
+        }
 
         // Filter by week if provided
         if (week) {
-            // For week filtering, we need to find picks made during that week
-            // This is a simplified approach - in production you might want more precise week tracking
-            query = query.order('created_at', { ascending: false });
+            query = query.eq('week', parseInt(week));
         }
+
+        // Order by creation date
+        query = query.order('created_at', { ascending: false });
 
         const { data: picks, error: picksError } = await query;
 
         if (picksError) {
+            console.error('Picks query error:', picksError);
             return NextResponse.json({ error: 'Failed to fetch picks' }, { status: 500 });
         }
 
-        // If week is specified, filter picks to that week
-        let filteredPicks = picks || [];
-        if (week) {
-            // Simple filtering - in production you'd want better week tracking
-            filteredPicks = picks?.filter(() => {
-                // This is a simplified check - you might want to store week number on picks
-                return true; // For now, return all picks
-            }) || [];
-        }
-
-        return NextResponse.json({ picks: filteredPicks });
+        return NextResponse.json({
+            picks: picks || [],
+            week: week ? parseInt(week) : null
+        });
 
     } catch (err) {
         console.error('API: Unhandled error:', err);
@@ -116,29 +125,47 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Check for existing pick this week - delete if exists (overwrite behavior)
+        // Get the season and week for this game
+        const { data: gameWithSeason, error: seasonError } = await supabaseAdmin
+            .from('games')
+            .select(`
+                id,
+                start_time,
+                season_id,
+                seasons(id, start_date)
+            `)
+            .eq('id', game_id)
+            .single();
 
-        // For simplicity, we'll find any recent pick by this user and delete it
-        // In production, you might want to store the week number on picks for better tracking
-        const { data: existingPicks } = await supabaseAdmin
+        if (seasonError || !gameWithSeason) {
+            return NextResponse.json({ error: 'Game season not found' }, { status: 404 });
+        }
+
+        // Calculate week number based on game start time and season start
+        const seasonStart = new Date(gameWithSeason.seasons.start_date);
+        const gameStart = new Date(gameWithSeason.start_time);
+        const weekNumber = Math.ceil((gameStart.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+
+        // Check for existing pick this week in this season
+        const { data: existingPick, error: existingError } = await supabaseAdmin
             .from('picks')
-            .select('id')
+            .select('id, game_id')
             .eq('user_id', user.id)
-            .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
-            .order('created_at', { ascending: false });
+            .eq('week', weekNumber)
+            .eq('games.season_id', gameWithSeason.season_id)
+            .single();
 
-        // Delete existing picks from this week
-        if (existingPicks && existingPicks.length > 0) {
-            const { error: deleteError } = await supabaseAdmin
-                .from('picks')
-                .delete()
-                .eq('user_id', user.id)
-                .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        if (existingError && existingError.code !== 'PGRST116') {
+            console.error('Error checking existing pick:', existingError);
+            return NextResponse.json({ error: 'Error checking existing picks' }, { status: 500 });
+        }
 
-            if (deleteError) {
-                console.error('Error deleting existing picks:', deleteError);
-                // Continue anyway - we'll still create the new pick
-            }
+        // If user already has a pick this week, return error instead of deleting
+        if (existingPick) {
+            return NextResponse.json({
+                error: `You already have a pick for Week ${weekNumber}. You can only make one pick per week.`,
+                existing_pick: existingPick
+            }, { status: 400 });
         }
 
         // Create the new pick
@@ -149,6 +176,7 @@ export async function POST(request: NextRequest) {
                 game_id,
                 bet_type,
                 selection,
+                week: weekNumber,
                 result: null // Will be updated when game completes
             })
             .select()

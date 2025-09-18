@@ -215,7 +215,7 @@ export default function LeaguePage() {
             ) : leagueLeaderboard?.leaderboard?.length ? (
               <div className="space-y-3">
                 {leagueLeaderboard.leaderboard.slice(0, 5).map((entry) => (
-                  <div key={entry.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div key={entry.user_id} className="flex items-center justify-between p-3  rounded">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold text-gray-600">#{entry.rank}</span>
                       <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">

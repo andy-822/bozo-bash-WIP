@@ -3,13 +3,13 @@
 import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { Calendar, GamepadIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import Leaderboard from '@/components/Leaderboard';
-import { useSeason, useGames } from '@/hooks/useGames';
-import { usePicks } from '@/hooks/usePicks';
+import { useSeason, useGames, useGamesForWeek } from '@/hooks/useGames';
+import { useUserWeekPicks } from '@/hooks/useUserWeekPicks';
 import { useModalStore } from '@/stores/modalStore';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { Game } from '@/types';
@@ -43,18 +43,36 @@ export default function SeasonPage() {
     refetch: refetchGames,
   } = useGames(seasonId);
 
-  const games = gamesData?.games || [];
   const currentWeek = gamesData?.currentWeek || 1;
   const totalGames = gamesData?.totalGames || 0;
 
-  const {
-    data: picks = [],
-    isLoading: picksLoading,
-    error: picksError,
-  } = usePicks(currentWeek);
+  // Week selector state
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
 
-  const pageLoading = seasonLoading || gamesLoading || picksLoading;
-  const error = seasonError || gamesError || picksError;
+  // Update selected week when current week changes
+  useEffect(() => {
+    setSelectedWeek(currentWeek);
+  }, [currentWeek]);
+
+  // Get games for the selected week
+  const {
+    data: weekGamesData,
+    isLoading: weekGamesLoading,
+    error: weekGamesError,
+  } = useGamesForWeek(seasonId, selectedWeek);
+
+  const games = weekGamesData?.games || [];
+
+  // Get user's picks for the selected week
+  const {
+    data: userWeekPicksData,
+    isLoading: userPicksLoading,
+  } = useUserWeekPicks(seasonId, selectedWeek);
+
+  const userWeekPick = userWeekPicksData?.picks?.[0] || null;
+
+  const pageLoading = seasonLoading || gamesLoading || weekGamesLoading || userPicksLoading;
+  const error = seasonError || gamesError || weekGamesError;
 
   const setBreadcrumbs = useNavigationStore((state) => state.setBreadcrumbs);
 
@@ -157,12 +175,63 @@ export default function SeasonPage() {
       </div>
 
       <div className="space-y-6">
+        {/* Week Selector */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <GamepadIcon className="h-5 w-5" />
+              Week {selectedWeek}
+            </h2>
+            {selectedWeek !== currentWeek && (
+              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                {selectedWeek < currentWeek ? 'Viewing past week' : 'Viewing future week'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))}
+              disabled={selectedWeek <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Prev
+            </Button>
+
+            <span className="text-sm text-gray-600 min-w-[60px] text-center">
+              Week {selectedWeek}
+            </span>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedWeek(Math.min(18, selectedWeek + 1))}
+              disabled={selectedWeek >= 18}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+
+            {selectedWeek !== currentWeek && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setSelectedWeek(currentWeek)}
+                className="ml-2"
+              >
+                Current Week
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Games Section */}
         <div className="border rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <GamepadIcon className="h-5 w-5" />
-            Week {currentWeek} & {currentWeek + 1} Games
-          </h2>
+          <h3 className="text-lg font-medium mb-4">
+            Games
+          </h3>
 
           {games.length === 0 ? (
             <div className="text-center py-8">
@@ -222,13 +291,42 @@ export default function SeasonPage() {
                         </span>
 
                         {!isCompleted && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMakePickClick(game)}
-                          >
-                            Make Pick
-                          </Button>
+                          <>
+                            {userWeekPick && userWeekPick.game_id === game.id ? (
+                              <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                                <CheckCircle className="h-4 w-4" />
+                                Your Pick
+                              </div>
+                            ) : userWeekPick ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                                className="opacity-50 cursor-not-allowed"
+                                title={`You already picked a game for Week ${selectedWeek}`}
+                              >
+                                Week Picked
+                              </Button>
+                            ) : selectedWeek !== currentWeek ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                                className="opacity-50 cursor-not-allowed"
+                                title="You can only make picks for the current week"
+                              >
+                                {selectedWeek < currentWeek ? 'Past Week' : 'Future Week'}
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMakePickClick(game)}
+                              >
+                                Make Pick
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -282,78 +380,10 @@ export default function SeasonPage() {
         </div>
 
         {/* League Picks */}
-        <LeaguePicksDisplay leagueId={leagueId} currentWeek={currentWeek} />
+        <LeaguePicksDisplay leagueId={leagueId} currentWeek={selectedWeek} />
 
-        {/* Upcoming: Picks & Leaderboard sections */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">My Picks (Week {currentWeek})</h3>
-
-            {picks.length === 0 ? (
-              <p className="text-gray-600 text-sm">
-                No picks made for Week {currentWeek} yet
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {picks.map((pick) => {
-                  const gameTime = new Date(pick.games.start_time);
-                  const isGameStarted = new Date() >= gameTime;
-
-                  return (
-                    <div
-                      key={pick.id}
-                      className="p-3 border rounded-lg bg-blue-50"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-medium text-sm">
-                          {pick.games.away_team.name} @ {pick.games.home_team.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="font-medium text-blue-900">
-                            {pick.bet_type === 'moneyline' && `${pick.selection} to win`}
-                            {pick.bet_type === 'spread' && `${pick.selection}`}
-                            {pick.bet_type === 'total' && `${pick.selection} points`}
-                          </div>
-                          <div className="text-xs text-blue-600 capitalize">
-                            {pick.bet_type}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          {pick.result ? (
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              pick.result === 'win'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {pick.result.toUpperCase()}
-                            </span>
-                          ) : isGameStarted ? (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                              PENDING
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                              ACTIVE
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <Leaderboard seasonId={seasonId} currentWeek={currentWeek} />
-        </div>
+        {/* Leaderboard section */}
+        <Leaderboard seasonId={seasonId} currentWeek={selectedWeek} />
       </div>
 
       <MakePickModal
