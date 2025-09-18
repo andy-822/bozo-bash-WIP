@@ -58,7 +58,9 @@ export default function AppWrapper({ children }: { children: ReactNode }) {
         });
 
         // Expose query client globally for debugging
-        (window as unknown as { __REACT_QUERY_CLIENT__: typeof client }).__REACT_QUERY_CLIENT__ = client;
+        if (typeof window !== 'undefined') {
+          (window as unknown as { __REACT_QUERY_CLIENT__: typeof client }).__REACT_QUERY_CLIENT__ = client;
+        }
       }
 
       return client;

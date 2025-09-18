@@ -10,6 +10,7 @@ import SeasonsManager from '@/components/SeasonsManager';
 import InviteModal from '@/components/InviteModal';
 import { useModalStore } from '@/stores/modalStore';
 import { useNavigationStore } from '@/stores/navigationStore';
+import { useLeagueLeaderboard } from '@/hooks/useLeaderboard';
 
 interface League {
   id: number;
@@ -47,6 +48,11 @@ export default function LeaguePage() {
   } = useModalStore();
 
   const setBreadcrumbs = useNavigationStore((state) => state.setBreadcrumbs);
+
+  const {
+    data: leagueLeaderboard,
+    isLoading: leaderboardLoading
+  } = useLeagueLeaderboard(leagueId);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -195,10 +201,45 @@ export default function LeaguePage() {
           <SeasonsManager leagueId={leagueId} isAdmin={isAdmin} />
 
           <div className="border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Leaderboard</h2>
-            <p className="text-gray-600">
-              Leaderboard will appear here once picks start coming in.
-            </p>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Trophy className="h-5 w-5" />
+              League Leaderboard
+            </h2>
+
+            {leaderboardLoading ? (
+              <div className="animate-pulse space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-8 bg-gray-200 rounded"></div>
+                ))}
+              </div>
+            ) : leagueLeaderboard?.leaderboard?.length ? (
+              <div className="space-y-3">
+                {leagueLeaderboard.leaderboard.slice(0, 5).map((entry) => (
+                  <div key={entry.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-600">#{entry.rank}</span>
+                      <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                        <span className="text-xs">{entry.username.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <span className="font-medium">{entry.username}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{entry.total_points} pts</div>
+                      <div className="text-xs text-gray-500">{entry.win_percentage}%</div>
+                    </div>
+                  </div>
+                ))}
+                {leagueLeaderboard.leaderboard.length > 5 && (
+                  <p className="text-sm text-gray-500 text-center pt-2">
+                    ...and {leagueLeaderboard.leaderboard.length - 5} more players
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-600">
+                League standings will appear here once seasons are completed.
+              </p>
+            )}
           </div>
         </div>
 

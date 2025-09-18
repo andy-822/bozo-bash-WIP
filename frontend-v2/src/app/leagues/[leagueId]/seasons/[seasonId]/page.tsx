@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { Calendar, GamepadIcon } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
+import Leaderboard from '@/components/Leaderboard';
 import { useSeason, useGames } from '@/hooks/useGames';
 import { usePicks } from '@/hooks/usePicks';
 import { useModalStore } from '@/stores/modalStore';
@@ -351,12 +352,7 @@ export default function SeasonPage() {
             )}
           </div>
 
-          <div className="border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Season Leaderboard</h3>
-            <p className="text-gray-600 text-sm">
-              Season standings will be calculated here
-            </p>
-          </div>
+          <Leaderboard seasonId={seasonId} currentWeek={currentWeek} />
         </div>
       </div>
 

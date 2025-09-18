@@ -4,6 +4,7 @@ import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import SeasonSwitcher from '@/components/SeasonSwitcher';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="flex items-center gap-6">
             <h1 className="text-xl font-bold">Bozo Bash</h1>
             <Breadcrumbs />
+            <SeasonSwitcher />
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:block">
