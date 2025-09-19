@@ -1,8 +1,7 @@
 {
-  "cron": [
-    {
-      "path": "/api/cron/game-monitor",
-      "schedule": "0,15,30,45 * * * *"
+  "functions": {
+    "src/app/api/scoring/auto/route.ts": {
+      "maxDuration": 60
     }
-  ]
+  }
 }
