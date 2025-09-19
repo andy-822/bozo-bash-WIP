@@ -1,4 +1,4 @@
- name: NFL Game Scoring
+name: NFL Game Scoring
 
   on:
     schedule:
@@ -14,7 +14,7 @@
       steps:
         - name: Score Completed NFL Games
           run: |
-            echo "🏈 Checking for completed NFL games..."
+            echo "Checking for completed NFL games..."
 
             response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/scoring/auto" \
               -H "Content-Type: application/json" \
@@ -23,16 +23,10 @@
             http_code=$(echo $response | tail -c 4)
 
             if [ "$http_code" = "200" ]; then
-              echo "✅ Scoring completed successfully"
-              cat response.json | jq . || cat response.json
+              echo "Scoring completed successfully"
+              cat response.json
             else
-              echo "❌ Scoring failed with HTTP $http_code"
+              echo "Scoring failed with HTTP $http_code"
               cat response.json
               exit 1
             fi
-
-        - name: Log Results
-          if: always()
-          run: |
-            echo "📊 Scoring job completed at $(date)"
-            echo "🔗 App URL: ${{ secrets.VERCEL_APP_URL }}"
