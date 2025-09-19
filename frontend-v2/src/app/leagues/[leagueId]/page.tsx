@@ -71,31 +71,15 @@ export default function LeaguePage() {
       setPageLoading(true);
       setError(null);
 
-      // Fetch league details
-      const { data: rawLeagueData, error: leagueError } = await supabase
-        .from('leagues')
-        .select(`
-          id,
-          name,
-          created_at,
-          admin_id,
-          sport_id,
-          sports(name)
-        `)
-        .eq('id', leagueId)
-        .single();
+      // Fetch league details via API
+      const response = await fetch(`/api/leagues/${leagueId}`);
 
-      if (leagueError) {
+      if (!response.ok) {
         setError('League not found');
         return;
       }
 
-      // Transform the data to match our interface
-      const leagueData: League = {
-        ...rawLeagueData,
-        sports: Array.isArray(rawLeagueData.sports) ? rawLeagueData.sports[0] || null : rawLeagueData.sports
-      };
-
+      const { league: leagueData } = await response.json();
       setLeague(leagueData);
 
       // Set breadcrumbs
@@ -104,23 +88,14 @@ export default function LeaguePage() {
         { label: leagueData.name }
       ]);
 
-      // Fetch league members
-      const { data: membersData, error: membersError } = await supabase
-        .from('league_memberships')
-        .select(`
-          user_id,
-          joined_at,
-          profiles!inner(
-            username,
-            avatar_url
-          )
-        `)
-        .eq('league_id', leagueId);
+      // Fetch league members via API
+      const membersResponse = await fetch(`/api/leagues/${leagueId}/members`);
 
-      if (membersError) {
-        console.error('Error fetching members:', membersError);
-      } else {
+      if (membersResponse.ok) {
+        const { members: membersData } = await membersResponse.json();
         setMembers(membersData || []);
+      } else {
+        console.error('Error fetching members:', await membersResponse.text());
       }
 
     } catch (error) {

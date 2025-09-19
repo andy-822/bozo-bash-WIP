@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   fetchESPNScoreboard,
   processESPNGames,
@@ -6,6 +8,7 @@ import {
   getLiveGames,
 } from '@/lib/espn-monitor';
 import { getCurrentNFLWeek } from '@/lib/nfl-week';
+import { rateLimitGeneral } from '@/lib/rate-limit';
 
 /**
  * Test endpoint to manually check ESPN API integration
@@ -13,13 +16,57 @@ import { getCurrentNFLWeek } from '@/lib/nfl-week';
  * GET /api/test/espn?week=3
  */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const weekParam = searchParams.get('week');
-  const week = weekParam ? parseInt(weekParam) : getCurrentNFLWeek();
-
-  console.log(`Testing ESPN integration for week ${week}`);
-
   try {
+    // Authentication check
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Check if user is admin of any league (simple admin check)
+    const { data: adminLeagues, error: adminError } = await supabaseAdmin
+      .from('leagues')
+      .select('id')
+      .eq('admin_id', user.id)
+      .limit(1);
+
+    if (adminError || !adminLeagues || adminLeagues.length === 0) {
+      return NextResponse.json({
+        error: 'Access denied. Only league administrators can access test endpoints.'
+      }, { status: 403 });
+    }
+
+    // Rate limiting
+    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimitResult = await rateLimitGeneral(ip);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Too many requests',
+        message: 'Rate limit exceeded',
+        reset: new Date(rateLimitResult.reset).toISOString()
+      }, {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.toString()
+        }
+      });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const weekParam = searchParams.get('week');
+    const week = weekParam ? parseInt(weekParam) : getCurrentNFLWeek();
+
+    console.log(`Testing ESPN integration for week ${week} (User: ${user.id})`);
+
+    // Validate week parameter
+    if (week < 1 || week > 18) {
+      return NextResponse.json({ error: 'Invalid week parameter. Must be between 1 and 18.' }, { status: 400 });
+    }
     // 1. Fetch ESPN data
     const startTime = Date.now();
     const espnData = await fetchESPNScoreboard(week);

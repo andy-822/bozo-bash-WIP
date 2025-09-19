@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateId, validateEmail } from '@/lib/validation';
+import { generateSecureInviteCode } from '@/lib/crypto-utils';
 
 export async function POST(request: NextRequest) {
     try {
@@ -80,9 +81,27 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // For now, since we don't have an invitations table, we'll return an invite link
-        // In a full implementation, you'd store pending invitations and send emails
-        const inviteCode = btoa(`${leagueId}:${Date.now()}`).replace(/[+/=]/g, '');
+        // Generate secure invite code and store in database
+        const inviteCode = generateSecureInviteCode();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+        // Store invitation in database
+        const { data: invite, error: inviteError } = await supabaseAdmin
+            .from('league_invites')
+            .insert({
+                league_id: leagueId,
+                invite_code: inviteCode,
+                invited_email: email,
+                expires_at: expiresAt.toISOString()
+            })
+            .select('id, invite_code')
+            .single();
+
+        if (inviteError) {
+            return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
+        }
+
         const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${inviteCode}`;
 
         return NextResponse.json({
@@ -90,7 +109,7 @@ export async function POST(request: NextRequest) {
             message: 'Invitation created successfully',
             inviteLink,
             userExists: false,
-            note: 'Share this link with the user to join the league'
+            note: 'Share this link with the user to join the league. Link expires in 7 days.'
         });
 
     } catch (err) {

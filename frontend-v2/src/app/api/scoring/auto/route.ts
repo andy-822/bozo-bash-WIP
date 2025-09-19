@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCurrentNFLWeek } from '@/lib/nfl-week';
+import { rateLimitScoringAuto } from '@/lib/rate-limit';
 import {
   fetchESPNScoreboard,
   processESPNGames,
@@ -31,13 +32,51 @@ interface Pick {
   week: number;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const currentWeek = getCurrentNFLWeek();
 
   console.log(`Starting automated scoring for week ${currentWeek}`);
 
   try {
+    // Rate limiting
+    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimitResult = await rateLimitScoringAuto(ip);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Too many requests',
+        message: 'Rate limit exceeded for scoring endpoint',
+        reset: new Date(rateLimitResult.reset).toISOString()
+      }, {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.toString()
+        }
+      });
+    }
+
+    // CRON secret validation
+    const cronSecret = process.env.CRON_SECRET;
+    const providedSecret = request.headers.get('authorization')?.replace('Bearer ', '') ||
+                          request.headers.get('x-cron-secret');
+
+    if (!cronSecret) {
+      console.error('CRON_SECRET environment variable not configured');
+      return NextResponse.json({
+        error: 'Server configuration error'
+      }, { status: 500 });
+    }
+
+    if (!providedSecret || providedSecret !== cronSecret) {
+      console.warn('Unauthorized scoring auto request', { ip, providedSecret: !!providedSecret });
+      return NextResponse.json({
+        error: 'Unauthorized',
+        message: 'Valid CRON secret required'
+      }, { status: 401 });
+    }
     // 1. Fetch ESPN scoreboard data
     let espnData;
     let espnError: string | null = null;

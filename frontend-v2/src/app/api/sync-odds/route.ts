@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { rateLimitOddsSync } from '@/lib/rate-limit';
 
 interface OddsApiGame {
   id: string;
@@ -162,8 +163,45 @@ async function ensureTeam(supabase: typeof supabaseAdmin, teamName: string, spor
   return team.id;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimitResult = await rateLimitOddsSync(ip);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Too many requests',
+        message: 'Rate limit exceeded for odds sync endpoint',
+        reset: new Date(rateLimitResult.reset).toISOString()
+      }, {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.toString()
+        }
+      });
+    }
+
+    // CRON secret validation (optional but recommended)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedSecret = request.headers.get('authorization')?.replace('Bearer ', '') ||
+                          request.headers.get('x-cron-secret');
+
+    if (cronSecret && providedSecret && providedSecret !== cronSecret) {
+      console.warn('Invalid CRON secret provided for odds sync', { ip });
+      return NextResponse.json({
+        error: 'Unauthorized',
+        message: 'Invalid CRON secret'
+      }, { status: 401 });
+    }
+
+    // If CRON_SECRET is configured but not provided, warn but allow (for backward compatibility)
+    if (cronSecret && !providedSecret) {
+      console.warn('Odds sync called without CRON secret (consider adding authentication)', { ip });
+    }
+
     console.log('Starting NFL odds sync...');
 
     const supabase = supabaseAdmin;

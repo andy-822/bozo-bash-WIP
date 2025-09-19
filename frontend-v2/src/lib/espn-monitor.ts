@@ -1,4 +1,5 @@
 import { getCurrentNFLWeek } from './nfl-week';
+import { supabaseAdmin } from './supabase-admin';
 
 export interface ESPNCompetitor {
   id: string;
@@ -195,7 +196,6 @@ export async function logESPNAPICall(
   responseTimeMs: number,
   errorMessage?: string
 ) {
-  // This would be called from the API route where we have access to supabase
   const logData = {
     endpoint,
     week,
@@ -207,6 +207,234 @@ export async function logESPNAPICall(
     error_message: errorMessage || null,
   };
 
-  console.log('ESPN API call logged:', logData);
+  try {
+    await supabaseAdmin.from('espn_api_calls').insert(logData);
+    console.log('ESPN API call logged:', logData);
+  } catch (error) {
+    console.error('Failed to log ESPN API call:', error);
+  }
+
   return logData;
+}
+
+/**
+ * Enhanced game data structure for complete season management
+ */
+export interface EnhancedESPNGame extends ProcessedGameData {
+  venue: {
+    name: string;
+    city: string;
+    state: string;
+  };
+  week: number;
+  season: {
+    year: number;
+    type: number;
+  };
+  espnEventName: string;
+  homeTeamId: string;
+  awayTeamId: string;
+}
+
+/**
+ * Fetch complete season schedule from ESPN (weeks 1-18)
+ * This is the core function for the new architecture
+ */
+export async function fetchCompleteESPNSeason(): Promise<{
+  games: EnhancedESPNGame[];
+  summary: {
+    totalGames: number;
+    weeklyBreakdown: Record<number, number>;
+    season: { year: number; type: number };
+    fetchTime: number;
+  };
+}> {
+  console.log('Starting complete season fetch from ESPN (weeks 1-18)...');
+  const startTime = Date.now();
+
+  const allGames: EnhancedESPNGame[] = [];
+  const weeklyBreakdown: Record<number, number> = {};
+  let seasonInfo: { year: number; type: number } | null = null;
+
+  // Fetch all weeks with small delays to respect rate limits
+  for (let week = 1; week <= 18; week++) {
+    try {
+      console.log(`Fetching ESPN data for week ${week}/18...`);
+
+      const weekData = await fetchESPNScoreboard(week);
+      const enhancedGames = processEnhancedESPNGames(weekData);
+
+      allGames.push(...enhancedGames);
+      weeklyBreakdown[week] = enhancedGames.length;
+
+      // Capture season info from first successful response
+      if (!seasonInfo && weekData.season) {
+        seasonInfo = weekData.season;
+      }
+
+      // Small delay to avoid overwhelming ESPN API
+      if (week < 18) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+    } catch (error) {
+      console.error(`Failed to fetch week ${week}:`, error);
+      weeklyBreakdown[week] = 0;
+
+      // Log the failed attempt
+      await logESPNAPICall(
+        `/apis/site/v2/sports/football/nfl/scoreboard?week=${week}`,
+        week,
+        0,
+        0,
+        0,
+        0,
+        0,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+
+      // Continue with other weeks rather than failing completely
+    }
+  }
+
+  const fetchTime = Date.now() - startTime;
+  console.log(`Complete season fetch finished in ${fetchTime}ms. Total games: ${allGames.length}`);
+
+  return {
+    games: allGames,
+    summary: {
+      totalGames: allGames.length,
+      weeklyBreakdown,
+      season: seasonInfo || { year: new Date().getFullYear(), type: 2 },
+      fetchTime,
+    },
+  };
+}
+
+/**
+ * Process ESPN games data into enhanced format with venue and team info
+ */
+export function processEnhancedESPNGames(espnData: ESPNScoreboardResponse): EnhancedESPNGame[] {
+  if (!espnData.events || espnData.events.length === 0) {
+    return [];
+  }
+
+  return espnData.events.map(event => {
+    const competition = event.competitions[0];
+    const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+    if (!homeTeam || !awayTeam) {
+      throw new Error(`Invalid game data for ESPN game ${event.id}: missing team data`);
+    }
+
+    return {
+      espnGameId: event.id,
+      espnEventName: event.name,
+      homeTeam: {
+        abbreviation: homeTeam.team.abbreviation,
+        score: homeTeam.score ? parseInt(homeTeam.score) || null : null,
+      },
+      awayTeam: {
+        abbreviation: awayTeam.team.abbreviation,
+        score: awayTeam.score ? parseInt(awayTeam.score) || null : null,
+      },
+      status: {
+        name: competition.status.type.name,
+        state: competition.status.type.state,
+        completed: competition.status.type.completed,
+      },
+      startTime: event.date,
+      venue: {
+        name: competition.venue.fullName,
+        city: competition.venue.address?.city || '',
+        state: competition.venue.address?.state || '',
+      },
+      week: event.week.number,
+      season: event.season,
+      homeTeamId: homeTeam.team.id,
+      awayTeamId: awayTeam.team.id,
+    };
+  });
+}
+
+/**
+ * Team name mapping for odds APIs to ESPN abbreviations
+ */
+export const TEAM_NAME_MAPPING: Record<string, string> = {
+  // AFC East
+  'Buffalo Bills': 'BUF',
+  'Miami Dolphins': 'MIA',
+  'New England Patriots': 'NE',
+  'New York Jets': 'NYJ',
+
+  // AFC North
+  'Baltimore Ravens': 'BAL',
+  'Cincinnati Bengals': 'CIN',
+  'Cleveland Browns': 'CLE',
+  'Pittsburgh Steelers': 'PIT',
+
+  // AFC South
+  'Houston Texans': 'HOU',
+  'Indianapolis Colts': 'IND',
+  'Jacksonville Jaguars': 'JAX',
+  'Tennessee Titans': 'TEN',
+
+  // AFC West
+  'Denver Broncos': 'DEN',
+  'Kansas City Chiefs': 'KC',
+  'Las Vegas Raiders': 'LV',
+  'Los Angeles Chargers': 'LAC',
+
+  // NFC East
+  'Dallas Cowboys': 'DAL',
+  'New York Giants': 'NYG',
+  'Philadelphia Eagles': 'PHI',
+  'Washington Commanders': 'WSH',
+
+  // NFC North
+  'Chicago Bears': 'CHI',
+  'Detroit Lions': 'DET',
+  'Green Bay Packers': 'GB',
+  'Minnesota Vikings': 'MIN',
+
+  // NFC South
+  'Atlanta Falcons': 'ATL',
+  'Carolina Panthers': 'CAR',
+  'New Orleans Saints': 'NO',
+  'Tampa Bay Buccaneers': 'TB',
+
+  // NFC West
+  'Arizona Cardinals': 'ARI',
+  'Los Angeles Rams': 'LAR',
+  'San Francisco 49ers': 'SF',
+  'Seattle Seahawks': 'SEA',
+};
+
+/**
+ * Reverse mapping from ESPN abbreviations to full team names
+ */
+export const ESPN_TO_FULL_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(TEAM_NAME_MAPPING).map(([fullName, abbr]) => [abbr, fullName])
+);
+
+/**
+ * Find ESPN game by team abbreviations and date
+ */
+export function findESPNGameByTeamsAndDate(
+  games: EnhancedESPNGame[],
+  homeTeam: string,
+  awayTeam: string,
+  gameDate: Date
+): EnhancedESPNGame | null {
+  const targetDate = gameDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+  return games.find(game => {
+    const gameDate = new Date(game.startTime).toISOString().split('T')[0];
+    return (
+      gameDate === targetDate &&
+      game.homeTeam.abbreviation === homeTeam &&
+      game.awayTeam.abbreviation === awayTeam
+    );
+  }) || null;
 }

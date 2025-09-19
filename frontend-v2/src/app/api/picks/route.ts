@@ -2,9 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateId, validateRequestBody } from '@/lib/validation';
+import { rateLimitGeneral } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
     try {
+        // Rate limiting
+        const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+        const rateLimitResult = await rateLimitGeneral(ip);
+
+        if (!rateLimitResult.success) {
+            return NextResponse.json({
+                error: 'Too many requests',
+                message: 'Rate limit exceeded',
+                reset: new Date(rateLimitResult.reset).toISOString()
+            }, {
+                status: 429,
+                headers: {
+                    'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+                    'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+                    'X-RateLimit-Reset': rateLimitResult.reset.toString()
+                }
+            });
+        }
+
         const supabase = await createServerSupabaseClient();
         const { searchParams } = new URL(request.url);
         const week = searchParams.get('week');
@@ -38,9 +58,22 @@ export async function GET(request: NextRequest) {
                 )
             `);
 
-        // Filter by user if userOnly is true, otherwise show all picks
+        // Filter by user if userOnly is true, otherwise show all picks (admin only)
         if (userOnly) {
             query = query.eq('user_id', user.id);
+        } else {
+            // Check if user is admin of any league when requesting all picks
+            const { data: adminLeagues, error: adminError } = await supabaseAdmin
+                .from('leagues')
+                .select('id')
+                .eq('admin_id', user.id)
+                .limit(1);
+
+            if (adminError || !adminLeagues || adminLeagues.length === 0) {
+                // Not an admin, fallback to user-only picks
+                query = query.eq('user_id', user.id);
+            }
+            // If user is admin, query remains unchanged (shows all picks)
         }
 
         // Filter by season if provided
@@ -76,6 +109,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Rate limiting
+        const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+        const rateLimitResult = await rateLimitGeneral(ip);
+
+        if (!rateLimitResult.success) {
+            return NextResponse.json({
+                error: 'Too many requests',
+                message: 'Rate limit exceeded',
+                reset: new Date(rateLimitResult.reset).toISOString()
+            }, {
+                status: 429,
+                headers: {
+                    'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+                    'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+                    'X-RateLimit-Reset': rateLimitResult.reset.toString()
+                }
+            });
+        }
+
         const { game_id, bet_type, selection } = await request.json();
         const supabase = await createServerSupabaseClient();
 

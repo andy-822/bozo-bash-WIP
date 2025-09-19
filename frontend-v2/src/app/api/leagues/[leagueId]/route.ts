@@ -24,6 +24,27 @@ export async function GET(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
+        // Check if user has access to this league (admin or member)
+        const { data: membership, error: membershipError } = await supabaseAdmin
+            .from('league_memberships')
+            .select('user_id')
+            .eq('league_id', leagueId)
+            .eq('user_id', user.id)
+            .single();
+
+        // Also check if user is the admin
+        const { data: adminCheck, error: adminError } = await supabaseAdmin
+            .from('leagues')
+            .select('admin_id')
+            .eq('id', leagueId)
+            .eq('admin_id', user.id)
+            .single();
+
+        // User must be either a member or the admin
+        if ((membershipError && adminError) || (!membership && !adminCheck)) {
+            return NextResponse.json({ error: 'Access denied. You must be a member of this league.' }, { status: 403 });
+        }
+
         // Fetch league with additional info for the invite page
         const { data: leagueData, error: leagueError } = await supabaseAdmin
             .from('leagues')

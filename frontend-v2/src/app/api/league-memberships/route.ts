@@ -5,7 +5,7 @@ import { validateId } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
     try {
-        const { league_id } = await request.json();
+        const { league_id, invite_code } = await request.json();
         const supabase = await createServerSupabaseClient();
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -14,10 +14,28 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
+        // Validate required fields
+        if (!invite_code) {
+            return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
+        }
+
         // Validate league ID to prevent SQL injection
         const leagueIdValidation = validateId(league_id, 'League ID');
         if (!leagueIdValidation.isValid) {
             return NextResponse.json({ error: leagueIdValidation.errorMessage }, { status: 400 });
+        }
+
+        // Check if invite code is valid and not expired
+        const { data: invite, error: inviteError } = await supabaseAdmin
+            .from('league_invites')
+            .select('id, league_id, expires_at')
+            .eq('invite_code', invite_code)
+            .eq('league_id', league_id)
+            .gt('expires_at', new Date().toISOString())
+            .single();
+
+        if (inviteError || !invite) {
+            return NextResponse.json({ error: 'Invalid or expired invitation code' }, { status: 400 });
         }
 
         // Check if league exists

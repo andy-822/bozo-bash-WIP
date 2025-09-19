@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateRequestBody } from '@/lib/validation';
 
 export async function GET() {
@@ -12,23 +13,8 @@ export async function GET() {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        // Fetch leagues where user is a member
-        const { data: memberLeagues, error: memberError } = await supabase
-            .from('league_memberships')
-            .select(`
-                leagues!inner(
-                    id,
-                    name,
-                    created_at,
-                    admin_id,
-                    sport_id,
-                    sports(name)
-                )
-            `)
-            .eq('user_id', user.id);
-
         // Fetch leagues where user is admin
-        const { data: adminLeagues, error: adminError } = await supabase
+        const { data: adminLeagues, error: adminError } = await supabaseAdmin
             .from('leagues')
             .select(`
                 id,
@@ -40,12 +26,41 @@ export async function GET() {
             `)
             .eq('admin_id', user.id);
 
-        if (memberError || adminError) {
+        // Get memberships first
+        const { data: memberships, error: membershipError } = await supabaseAdmin
+            .from('league_memberships')
+            .select('league_id')
+            .eq('user_id', user.id);
+
+        let memberLeagues = [];
+        let memberError = null;
+
+        if (memberships && memberships.length > 0) {
+            // Get league details for those specific league IDs
+            const leagueIds = memberships.map(m => m.league_id);
+            const { data: memberLeagueData, error: memberLeagueError } = await supabaseAdmin
+                .from('leagues')
+                .select(`
+                    id,
+                    name,
+                    created_at,
+                    admin_id,
+                    sport_id,
+                    sports(name)
+                `)
+                .in('id', leagueIds);
+
+            memberLeagues = memberLeagueData || [];
+            memberError = memberLeagueError;
+        }
+
+        if (memberError || adminError || membershipError) {
+            console.error('League fetch errors:', { memberError, adminError, membershipError });
             return NextResponse.json({ error: 'Failed to fetch leagues' }, { status: 500 });
         }
 
         // Combine both types of leagues
-        const memberLeaguesData = memberLeagues?.map(membership => membership.leagues).filter(Boolean) || [];
+        const memberLeaguesData = memberLeagues || [];
         const adminLeaguesData = adminLeagues || [];
 
         // Type assertion to ensure consistent structure

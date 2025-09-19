@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: leagueValidation.errorMessage }, { status: 400 });
         }
 
-        // Verify user has access to this league (either admin or member)
-        const { data: league, error: leagueError } = await supabase
+        // Verify user has access to this league using admin client
+        const { data: league, error: leagueError } = await supabaseAdmin
             .from('leagues')
             .select('id, admin_id')
             .eq('id', leagueId)
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
         // If not admin, check if user is a member
         if (!hasAccess) {
-            const { data: membership, error: membershipError } = await supabase
+            const { data: membership, error: membershipError } = await supabaseAdmin
                 .from('league_memberships')
                 .select('user_id')
                 .eq('league_id', leagueId)

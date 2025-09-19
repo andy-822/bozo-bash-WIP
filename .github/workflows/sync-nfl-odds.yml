@@ -21,7 +21,8 @@ jobs:
       - name: Sync NFL Odds
         run: |
           echo "Syncing NFL odds at $(date)"
-          response=$(curl -s -w "%{http_code}" -L -X POST "${{ secrets.VERCEL_APP_URL }}/api/sync-odds")
+          response=$(curl -s -w "%{http_code}" -L -X POST "${{ secrets.VERCEL_APP_URL }}/api/sync-odds" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           http_code=${response: -3}
           response_body=${response%???}
 
