@@ -1,0 +1,47 @@
+ name: NFL Game Scoring
+
+  on:
+    schedule:
+      # Run every 15 minutes during NFL game times
+      # Thursday: 8:00 PM - 12:00 AM ET (00:00-04:00 UTC Friday)
+      - cron: '0,15,30,45 0-4 * * 5'
+
+      # Sunday: 1:00 PM - 11:30 PM ET (17:00-03:30 UTC Sunday/Monday)
+      - cron: '0,15,30,45 17-23 * * 0'
+      - cron: '0,15,30 0-3 * * 1'
+
+      # Monday: 8:00 PM - 12:00 AM ET (00:00-04:00 UTC Tuesday)
+      - cron: '0,15,30,45 0-4 * * 2'
+
+    # Allow manual triggering
+    workflow_dispatch:
+
+  jobs:
+    score-games:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Score Completed NFL Games
+          run: |
+            echo "🏈 Checking for completed NFL games..."
+
+            response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/scoring/auto" \
+              -H "Content-Type: application/json" \
+              -o response.json)
+
+            http_code=$(echo $response | tail -c 4)
+
+            if [ "$http_code" = "200" ]; then
+              echo "✅ Scoring completed successfully"
+              cat response.json | jq .
+            else
+              echo "❌ Scoring failed with HTTP $http_code"
+              cat response.json
+              exit 1
+            fi
+
+        - name: Log Results
+          if: always()
+          run: |
+            echo "📊 Scoring job completed at $(date)"
+            echo "🔗 App URL: ${{ secrets.VERCEL_APP_URL }}"
