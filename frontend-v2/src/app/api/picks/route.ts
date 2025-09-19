@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Calculate week number based on game start time and season start
-        const seasonStart = new Date(gameWithSeason.seasons.start_date);
+        const seasonStart = new Date((gameWithSeason.seasons as unknown as Record<string, unknown>).start_date as string);
         const gameStart = new Date(gameWithSeason.start_time);
         const weekNumber = Math.ceil((gameStart.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
 

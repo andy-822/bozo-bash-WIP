@@ -91,7 +91,7 @@ const fetchGamesForWeek = async (seasonId: string, week: number): Promise<GamesR
 
   // Simple week filtering based on game dates
   // Calculate week based on season start (approximation)
-  const weekGames = allGames.filter(game => {
+  const weekGames = allGames.filter((game: Game) => {
     const gameDate = new Date(game.start_time);
     const seasonStart = new Date(gameDate.getFullYear(), 8, 5); // Sept 5th
     const daysSinceStart = Math.floor((gameDate.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));

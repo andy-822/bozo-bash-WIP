@@ -3,6 +3,25 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateId } from '@/lib/validation';
 
+interface UserProfile {
+  username: string;
+  avatar_url: string | null;
+}
+
+interface LeaderboardEntry {
+  user_id: string;
+  total_picks: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  total_points: number;
+  current_streak: number;
+  best_streak: number;
+  worst_streak: number;
+  profiles: UserProfile | UserProfile[];
+}
+
+
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -107,7 +126,7 @@ async function getSeasonLeaderboard(seasonId: string, userId: string) {
         }
 
         // Calculate additional metrics
-        const enhancedLeaderboard = leaderboard?.map((entry: any, index: number) => ({
+        const enhancedLeaderboard = leaderboard?.map((entry: LeaderboardEntry, index: number) => ({
             rank: index + 1,
             user_id: entry.user_id,
             username: Array.isArray(entry.profiles) ? entry.profiles[0]?.username : entry.profiles?.username,
@@ -179,13 +198,13 @@ async function getWeeklyLeaderboard(seasonId: string, week: number, userId: stri
         // Aggregate weekly stats by user
         const userStats = new Map();
 
-        weeklyStats?.forEach((pick: any) => {
+        weeklyStats?.forEach((pick: Record<string, unknown>) => {
             const userId = pick.user_id;
             if (!userStats.has(userId)) {
                 userStats.set(userId, {
                     user_id: userId,
-                    username: Array.isArray(pick.profiles) ? pick.profiles[0]?.username : pick.profiles?.username,
-                    avatar_url: Array.isArray(pick.profiles) ? pick.profiles[0]?.avatar_url : pick.profiles?.avatar_url,
+                    username: Array.isArray(pick.profiles) ? (pick.profiles[0] as UserProfile)?.username : (pick.profiles as UserProfile)?.username,
+                    avatar_url: Array.isArray(pick.profiles) ? (pick.profiles[0] as UserProfile)?.avatar_url : (pick.profiles as UserProfile)?.avatar_url,
                     total_picks: 0,
                     wins: 0,
                     losses: 0,
@@ -267,13 +286,13 @@ async function getLeagueLeaderboard(leagueId: string, userId: string) {
         // Aggregate stats by user across all seasons
         const userStats = new Map();
 
-        leagueStats?.forEach((stat: any) => {
+        leagueStats?.forEach((stat: Record<string, unknown>) => {
             const userId = stat.user_id;
             if (!userStats.has(userId)) {
                 userStats.set(userId, {
                     user_id: userId,
-                    username: Array.isArray(stat.profiles) ? stat.profiles[0]?.username : stat.profiles?.username,
-                    avatar_url: Array.isArray(stat.profiles) ? stat.profiles[0]?.avatar_url : stat.profiles?.avatar_url,
+                    username: Array.isArray(stat.profiles) ? (stat.profiles[0] as UserProfile)?.username : (stat.profiles as UserProfile)?.username,
+                    avatar_url: Array.isArray(stat.profiles) ? (stat.profiles[0] as UserProfile)?.avatar_url : (stat.profiles as UserProfile)?.avatar_url,
                     total_picks: 0,
                     wins: 0,
                     losses: 0,
@@ -285,12 +304,12 @@ async function getLeagueLeaderboard(leagueId: string, userId: string) {
             }
 
             const aggregated = userStats.get(userId);
-            aggregated.total_picks += stat.total_picks;
-            aggregated.wins += stat.wins;
-            aggregated.losses += stat.losses;
-            aggregated.pushes += stat.pushes;
-            aggregated.total_points += stat.total_points;
-            aggregated.best_streak = Math.max(aggregated.best_streak, stat.best_streak);
+            aggregated.total_picks += (stat.total_picks as number) || 0;
+            aggregated.wins += (stat.wins as number) || 0;
+            aggregated.losses += (stat.losses as number) || 0;
+            aggregated.pushes += (stat.pushes as number) || 0;
+            aggregated.total_points += (stat.total_points as number) || 0;
+            aggregated.best_streak = Math.max(aggregated.best_streak, (stat.best_streak as number) || 0);
             aggregated.seasons_played++;
         });
 

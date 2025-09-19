@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCurrentNFLWeek } from '@/lib/nfl-week';
 import {
   fetchESPNScoreboard,
   processESPNGames,
   getCompletedGames,
-  logESPNAPICall,
   type ProcessedGameData,
 } from '@/lib/espn-monitor';
 
@@ -32,7 +31,7 @@ interface Pick {
   week: number;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const startTime = Date.now();
   const currentWeek = getCurrentNFLWeek();
 
@@ -218,7 +217,9 @@ async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
       .eq('id', dbGameByTeams.id);
 
     // Use the matched game
-    Object.assign(dbGame, dbGameByTeams);
+    if (dbGame && dbGameByTeams) {
+      Object.assign(dbGame, dbGameByTeams);
+    }
   }
 
   const typedDbGame = dbGame as unknown as DatabaseGame;

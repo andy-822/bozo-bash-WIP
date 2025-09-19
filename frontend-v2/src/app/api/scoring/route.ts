@@ -210,8 +210,7 @@ async function recalculateSeasonStats(seasonId: number) {
         const { data: users, error: usersError } = await supabaseAdmin
             .from('picks')
             .select('user_id')
-            .eq('games.season_id', seasonId, { referencedTable: 'games' })
-            .distinct();
+            .eq('games.season_id', seasonId);
 
         if (usersError) {
             return { error: 'Failed to fetch users' };
