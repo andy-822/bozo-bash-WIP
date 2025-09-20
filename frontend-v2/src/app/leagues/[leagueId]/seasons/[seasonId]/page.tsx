@@ -357,59 +357,155 @@ export default function SeasonPage() {
           ) : (
             /* Game Details View */
             selectedGameForDetails && (
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-2xl mx-auto">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl mb-2">Game Info</CardTitle>
+                    <div className="text-xl font-semibold">
                       {selectedGameForDetails.away_team.name} @ {selectedGameForDetails.home_team.name}
-                    </CardTitle>
+                    </div>
                     <div className="text-sm text-gray-600">
                       {formatGameTime(selectedGameForDetails.start_time).date} at {formatGameTime(selectedGameForDetails.start_time).time}
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-8">
-                      {/* Team Info */}
-                      <div className="space-y-4">
-                        <div className="text-center p-4 border rounded-lg">
-                          <h3 className="font-semibold">{selectedGameForDetails.away_team.name}</h3>
-                          <p className="text-sm text-gray-600">Away</p>
-                        </div>
-                        <div className="text-center p-4 border rounded-lg">
-                          <h3 className="font-semibold">{selectedGameForDetails.home_team.name}</h3>
-                          <p className="text-sm text-gray-600">Home</p>
-                        </div>
-                      </div>
-
-                      {/* Betting Options */}
-                      <div className="space-y-4">
-                        <h3 className="font-semibold">Betting Options</h3>
-                        {selectedGameForDetails.odds && selectedGameForDetails.odds.length > 0 ? (
-                          <div className="space-y-3">
-                            {/* Add betting interface here - this will be enhanced next */}
-                            <div className="p-4 border rounded-lg">
-                              <h4 className="font-medium mb-2">Moneyline</h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-auto p-3">
-                                  <div>
-                                    <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
-                                    <div className="text-sm">{selectedGameForDetails.odds[0]?.moneyline_away || 'N/A'}</div>
-                                  </div>
-                                </Button>
-                                <Button variant="outline" className="h-auto p-3">
-                                  <div>
-                                    <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
-                                    <div className="text-sm">{selectedGameForDetails.odds[0]?.moneyline_home || 'N/A'}</div>
-                                  </div>
-                                </Button>
-                              </div>
+                    {selectedGameForDetails.odds && selectedGameForDetails.odds.length > 0 ? (
+                      <div className="space-y-6">
+                        {/* Betting Options Grid */}
+                        <div className="grid grid-cols-3 gap-6">
+                          {/* Money Line Column */}
+                          <div className="text-center">
+                            <h3 className="font-semibold mb-4 text-lg">ML</h3>
+                            <div className="space-y-3">
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle moneyline pick for away team
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.moneyline_away ?
+                                    (selectedGameForDetails.odds[0].moneyline_away > 0 ?
+                                      `+${selectedGameForDetails.odds[0].moneyline_away}` :
+                                      selectedGameForDetails.odds[0].moneyline_away
+                                    ) : 'N/A'
+                                  }
+                                </div>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle moneyline pick for home team
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.moneyline_home ?
+                                    (selectedGameForDetails.odds[0].moneyline_home > 0 ?
+                                      `+${selectedGameForDetails.odds[0].moneyline_home}` :
+                                      selectedGameForDetails.odds[0].moneyline_home
+                                    ) : 'N/A'
+                                  }
+                                </div>
+                              </Button>
                             </div>
                           </div>
-                        ) : (
-                          <p className="text-gray-600">No odds available</p>
+
+                          {/* Spread Column */}
+                          <div className="text-center">
+                            <h3 className="font-semibold mb-4 text-lg">SP</h3>
+                            <div className="space-y-3">
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle spread pick for away team
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.spread_away !== null && selectedGameForDetails.odds[0]?.spread_away !== undefined ?
+                                    (selectedGameForDetails.odds[0].spread_away > 0 ?
+                                      `+${selectedGameForDetails.odds[0].spread_away}` :
+                                      selectedGameForDetails.odds[0].spread_away
+                                    ) : 'N/A'
+                                  }
+                                </div>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle spread pick for home team
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.spread_home !== null && selectedGameForDetails.odds[0]?.spread_home !== undefined ?
+                                    (selectedGameForDetails.odds[0].spread_home > 0 ?
+                                      `+${selectedGameForDetails.odds[0].spread_home}` :
+                                      selectedGameForDetails.odds[0].spread_home
+                                    ) : 'N/A'
+                                  }
+                                </div>
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Over/Under Column */}
+                          <div className="text-center">
+                            <h3 className="font-semibold mb-4 text-lg">OU</h3>
+                            <div className="space-y-3">
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle over pick
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">Over</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.total_over || 'N/A'}
+                                </div>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full h-auto p-4 flex flex-col"
+                                onClick={() => {
+                                  // Handle under pick
+                                  handleMakePickClick(selectedGameForDetails);
+                                }}
+                              >
+                                <div className="font-medium">Under</div>
+                                <div className="text-sm text-gray-600">
+                                  {selectedGameForDetails.odds[0]?.total_under || 'N/A'}
+                                </div>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Odds Source Info */}
+                        {selectedGameForDetails.odds[0] && (
+                          <div className="text-center text-xs text-gray-500 pt-4 border-t">
+                            Odds from {selectedGameForDetails.odds[0].sportsbook} •
+                            Updated {new Date(selectedGameForDetails.odds[0].last_update).toLocaleTimeString()}
+                          </div>
                         )}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">No odds available for this game</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
