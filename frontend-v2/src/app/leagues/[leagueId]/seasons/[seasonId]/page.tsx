@@ -2,18 +2,23 @@
 
 import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import Leaderboard from '@/components/Leaderboard';
 import { useSeason, useGames, useGamesForWeek } from '@/hooks/useGames';
 import { useUserWeekPicks } from '@/hooks/useUserWeekPicks';
+import { useLeaguePicks } from '@/hooks/usePicks';
 import { useModalStore } from '@/stores/modalStore';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { Game } from '@/types';
 
+
+type ViewState = 'overview' | 'game-details';
 
 export default function SeasonPage() {
   const { user, loading } = useUserStore();
@@ -21,6 +26,10 @@ export default function SeasonPage() {
   const params = useParams();
   const leagueId = params.leagueId as string;
   const seasonId = params.seasonId as string;
+
+  // UI State
+  const [viewState, setViewState] = useState<ViewState>('overview');
+  const [selectedGameForDetails, setSelectedGameForDetails] = useState<Game | null>(null);
 
   const {
     pickModalOpen: showPickModal,
@@ -69,9 +78,16 @@ export default function SeasonPage() {
     isLoading: userPicksLoading,
   } = useUserWeekPicks(seasonId, selectedWeek);
 
-  const userWeekPick = userWeekPicksData?.picks?.[0] || null;
+  // Get all league picks for the selected week
+  const {
+    data: leaguePicksData,
+    isLoading: leaguePicksLoading,
+  } = useLeaguePicks(leagueId, selectedWeek);
 
-  const pageLoading = seasonLoading || gamesLoading || weekGamesLoading || userPicksLoading;
+  const userWeekPick = userWeekPicksData?.picks?.[0] || null;
+  const leaguePicks = leaguePicksData || [];
+
+  const pageLoading = seasonLoading || gamesLoading || weekGamesLoading || userPicksLoading || leaguePicksLoading;
   const error = seasonError || gamesError || weekGamesError;
 
   const setBreadcrumbs = useNavigationStore((state) => state.setBreadcrumbs);
@@ -115,6 +131,30 @@ export default function SeasonPage() {
     };
   };
 
+  const handleGameClick = (game: Game) => {
+    setSelectedGameForDetails(game);
+    setViewState('game-details');
+  };
+
+  const handleBackToOverview = () => {
+    setViewState('overview');
+    setSelectedGameForDetails(null);
+  };
+
+  const getGameStatusBadge = (game: Game) => {
+    if (game.status === 'completed') {
+      return <Badge variant="default" className="bg-green-100 text-green-800">Final</Badge>;
+    }
+    if (game.status === 'live') {
+      return <Badge variant="default" className="bg-red-100 text-red-800">Live</Badge>;
+    }
+    return <Badge variant="outline">Scheduled</Badge>;
+  };
+
+  const hasUserPickedGame = (gameId: number) => {
+    return leaguePicks.some(pick => pick.game_id === gameId && pick.user_id === user?.id);
+  };
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -146,49 +186,12 @@ export default function SeasonPage() {
   }
 
   return (
-    <>
-      <div className="mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{season.name}</h1>
-            <div className="flex items-center gap-4 text-gray-600">
-              <span className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {season.start_date || season.end_date ? (
-                  <span>
-                    {formatDate(season.start_date)} - {formatDate(season.end_date)}
-                  </span>
-                ) : (
-                  <span>No dates set</span>
-                )}
-              </span>
-              <span className="flex items-center gap-1">
-                <GamepadIcon className="h-4 w-4" />
-                Week {currentWeek}: {games.length} game{games.length !== 1 ? 's' : ''}
-                {totalGames > games.length && (
-                  <span className="text-gray-500">({totalGames} total)</span>
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {/* Week Selector */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <GamepadIcon className="h-5 w-5" />
-              Week {selectedWeek}
-            </h2>
-            {selectedWeek !== currentWeek && (
-              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                {selectedWeek < currentWeek ? 'Viewing past week' : 'Viewing future week'}
-              </span>
-            )}
-          </div>
-
+    <div className="flex h-screen">
+      {/* Left Sidebar */}
+      <div className="w-80  border-r border-gray-200 flex flex-col">
+        {/* Sidebar Header with Week Selector */}
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold mb-3">Week {selectedWeek}</h2>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -197,7 +200,6 @@ export default function SeasonPage() {
               disabled={selectedWeek <= 1}
             >
               <ChevronLeft className="h-4 w-4" />
-              Prev
             </Button>
 
             <span className="text-sm text-gray-600 min-w-[60px] text-center">
@@ -210,7 +212,6 @@ export default function SeasonPage() {
               onClick={() => setSelectedWeek(Math.min(18, selectedWeek + 1))}
               disabled={selectedWeek >= 18}
             >
-              Next
               <ChevronRight className="h-4 w-4" />
             </Button>
 
@@ -221,169 +222,200 @@ export default function SeasonPage() {
                 onClick={() => setSelectedWeek(currentWeek)}
                 className="ml-2"
               >
-                Current Week
+                Current
               </Button>
             )}
           </div>
         </div>
 
-        {/* Games Section */}
-        <div className="border rounded-lg p-6">
-          <h3 className="text-lg font-medium mb-4">
-            Games
-          </h3>
-
+        {/* Games List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {games.length === 0 ? (
             <div className="text-center py-8">
-              <GamepadIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">No games scheduled for this season yet</p>
-              <p className="text-sm text-gray-500">
-                Games will appear here once they are added to the season
-              </p>
+              <GamepadIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">No games this week</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {games.map((game) => {
-                const gameTime = formatGameTime(game.start_time);
-                const isCompleted = game.status === 'completed';
+            games.map((game) => {
+              const gameTime = formatGameTime(game.start_time);
+              const isCompleted = game.status === 'completed';
+              const userPicked = hasUserPickedGame(game.id);
 
-                // Get the best odds (for now, just use the first available)
-                const bestOdds = game.odds?.[0];
+              return (
+                <Card
+                  key={game.id}
+                  className={`cursor-pointer transition-colors hover:bg-gray-50 ${
+                    selectedGameForDetails?.id === game.id ? 'ring-2 ring-blue-500' : ''
+                  } ${userPicked ? 'border-green-200 bg-green-50' : ''}`}
+                  onClick={() => handleGameClick(game)}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="text-sm">
+                        <div className="font-medium">{game.away_team.abbreviation}</div>
+                        <div className="text-gray-500 text-xs">@</div>
+                        <div className="font-medium">{game.home_team.abbreviation}</div>
+                      </div>
+                      {getGameStatusBadge(game)}
+                    </div>
 
-                return (
-                  <div
-                    key={game.id}
-                    className="p-4 border rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-6">
-                        <div className="text-center min-w-[120px]">
-                          <div className="font-medium">{game.away_team.name}</div>
-                          <div className="text-sm text-gray-500">@</div>
-                          <div className="font-medium">{game.home_team.name}</div>
+                    {isCompleted && game.home_score !== null && game.away_score !== null ? (
+                      <div className="text-center">
+                        <div className="font-bold text-sm">
+                          {game.away_score} - {game.home_score}
                         </div>
+                        <div className="text-xs text-green-600">Final</div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <div className="text-xs text-gray-600">{gameTime.date}</div>
+                        <div className="text-xs text-gray-500">{gameTime.time}</div>
+                      </div>
+                    )}
 
-                        {isCompleted && game.home_score !== null && game.away_score !== null ? (
-                          <div className="text-center min-w-[80px]">
-                            <div className="font-bold text-lg">
-                              {game.away_score} - {game.home_score}
-                            </div>
-                            <div className="text-sm text-green-600 font-medium">Final</div>
-                          </div>
-                        ) : (
-                          <div className="text-center min-w-[80px]">
-                            <div className="font-medium">{gameTime.date}</div>
-                            <div className="text-sm text-gray-500">{gameTime.time}</div>
-                          </div>
-                        )}
+                    {userPicked && (
+                      <div className="mt-2 flex items-center justify-center">
+                        <div className="flex items-center gap-1 text-xs text-green-700">
+                          <CheckCircle className="h-3 w-3" />
+                          Picked
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="border-b border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">{season.name}</h1>
+              <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {season.start_date || season.end_date ? (
+                    <span>
+                      {formatDate(season.start_date)} - {formatDate(season.end_date)}
+                    </span>
+                  ) : (
+                    <span>No dates set</span>
+                  )}
+                </span>
+                <span className="flex items-center gap-1">
+                  <GamepadIcon className="h-4 w-4" />
+                  Week {currentWeek}: {games.length} game{games.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+
+            {viewState === 'game-details' && (
+              <Button variant="outline" onClick={handleBackToOverview}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Overview
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {viewState === 'overview' ? (
+            <div className="grid grid-cols-2 gap-6 h-full">
+              {/* League Picks Column */}
+              <div>
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <GamepadIcon className="h-5 w-5" />
+                      Week {selectedWeek} Picks
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-y-auto">
+                    <LeaguePicksDisplay leagueId={leagueId} currentWeek={selectedWeek} />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Leaderboard Column */}
+              <div>
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>Leaderboard</CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-y-auto">
+                    <Leaderboard seasonId={seasonId} currentWeek={selectedWeek} />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            /* Game Details View */
+            selectedGameForDetails && (
+              <div className="max-w-4xl mx-auto">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xl">
+                      {selectedGameForDetails.away_team.name} @ {selectedGameForDetails.home_team.name}
+                    </CardTitle>
+                    <div className="text-sm text-gray-600">
+                      {formatGameTime(selectedGameForDetails.start_time).date} at {formatGameTime(selectedGameForDetails.start_time).time}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-8">
+                      {/* Team Info */}
+                      <div className="space-y-4">
+                        <div className="text-center p-4 border rounded-lg">
+                          <h3 className="font-semibold">{selectedGameForDetails.away_team.name}</h3>
+                          <p className="text-sm text-gray-600">Away</p>
+                        </div>
+                        <div className="text-center p-4 border rounded-lg">
+                          <h3 className="font-semibold">{selectedGameForDetails.home_team.name}</h3>
+                          <p className="text-sm text-gray-600">Home</p>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          game.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : game.status === 'live'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {game.status === 'completed' ? 'Final' :
-                           game.status === 'live' ? 'Live' : 'Scheduled'}
-                        </span>
-
-                        {!isCompleted && (
-                          <>
-                            {userWeekPick && userWeekPick.game_id === game.id ? (
-                              <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
-                                <CheckCircle className="h-4 w-4" />
-                                Your Pick
+                      {/* Betting Options */}
+                      <div className="space-y-4">
+                        <h3 className="font-semibold">Betting Options</h3>
+                        {selectedGameForDetails.odds && selectedGameForDetails.odds.length > 0 ? (
+                          <div className="space-y-3">
+                            {/* Add betting interface here - this will be enhanced next */}
+                            <div className="p-4 border rounded-lg">
+                              <h4 className="font-medium mb-2">Moneyline</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" className="h-auto p-3">
+                                  <div>
+                                    <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
+                                    <div className="text-sm">{selectedGameForDetails.odds[0]?.moneyline_away || 'N/A'}</div>
+                                  </div>
+                                </Button>
+                                <Button variant="outline" className="h-auto p-3">
+                                  <div>
+                                    <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
+                                    <div className="text-sm">{selectedGameForDetails.odds[0]?.moneyline_home || 'N/A'}</div>
+                                  </div>
+                                </Button>
                               </div>
-                            ) : userWeekPick ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled
-                                className="opacity-50 cursor-not-allowed"
-                                title={`You already picked a game for Week ${selectedWeek}`}
-                              >
-                                Week Picked
-                              </Button>
-                            ) : selectedWeek !== currentWeek ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled
-                                className="opacity-50 cursor-not-allowed"
-                                title="You can only make picks for the current week"
-                              >
-                                {selectedWeek < currentWeek ? 'Past Week' : 'Future Week'}
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleMakePickClick(game)}
-                              >
-                                Make Pick
-                              </Button>
-                            )}
-                          </>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-gray-600">No odds available</p>
                         )}
                       </div>
                     </div>
-
-                    {/* Odds Section */}
-                    {bestOdds && !isCompleted && (
-                      <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-100">
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 mb-1">Spread</div>
-                          <div className="text-sm font-medium">
-                            {bestOdds.spread_home !== null ? (
-                              <>
-                                {game.home_team.abbreviation} {bestOdds.spread_home > 0 ? '+' : ''}{bestOdds.spread_home}
-                              </>
-                            ) : (
-                              'N/A'
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 mb-1">Total</div>
-                          <div className="text-sm font-medium">
-                            {bestOdds.total_over !== null ? `O/U ${bestOdds.total_over}` : 'N/A'}
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 mb-1">Moneyline</div>
-                          <div className="text-sm font-medium">
-                            {bestOdds.moneyline_home !== null ? (
-                              <>
-                                {game.home_team.abbreviation} {bestOdds.moneyline_home > 0 ? '+' : ''}{bestOdds.moneyline_home}
-                              </>
-                            ) : (
-                              'N/A'
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {bestOdds && !isCompleted && (
-                      <div className="text-xs text-gray-400 mt-2">
-                        Odds from {bestOdds.sportsbook} • Updated {new Date(bestOdds.last_update).toLocaleTimeString()}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
           )}
         </div>
-
-        {/* League Picks */}
-        <LeaguePicksDisplay leagueId={leagueId} currentWeek={selectedWeek} />
-
-        {/* Leaderboard section */}
-        <Leaderboard seasonId={seasonId} currentWeek={selectedWeek} />
       </div>
 
       <MakePickModal
@@ -394,6 +426,6 @@ export default function SeasonPage() {
         seasonId={seasonId}
         onPickSubmitted={handlePickSubmitted}
       />
-    </>
+    </div>
   );
 }
