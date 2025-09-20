@@ -1,8 +1,14 @@
 # Bozos Parlay Challenge - Development Backlog
 
-## 🎉 Current Status: ESPN Architecture Complete ✅
+## 🎉 Current Status: Automated Scoring System Complete ✅
 
-**Major Achievement**: Successfully migrated from odds-centric to ESPN-centric game management
+**Major Achievement**: Successfully implemented comprehensive automated scoring with real-time leaderboards
+- **Enhanced scoring engine** with robust bet parsing (moneyline, spread, total)
+- **Configurable scoring rules** per league with admin management interface
+- **Real-time leaderboards** with season/weekly standings and auto-refresh
+- **Advanced features** including streak tracking, weekly winner bonuses, and performance analytics
+
+**Previous Achievement**: ESPN Architecture Migration ✅
 - **272 NFL games** ingested across all 18 weeks
 - **100% odds matching** with 241 records attached (0 errors)
 - **Single source of truth** established with ESPN as authoritative game data
@@ -33,6 +39,14 @@ ESPN API → Games (authoritative) → Match Odds → User Picks → Scoring
 - Real-time league-wide pick views with user attribution
 - Modal-based UI with consistent user experience
 
+### **Scoring & Leaderboards** ✅
+- Automated scoring engine with enhanced bet parsing
+- Real-time season and weekly leaderboards with auto-refresh
+- Configurable scoring rules (win/loss/push points, bonuses)
+- Streak tracking (current, best, worst) with visual indicators
+- Weekly winner bonuses and performance analytics
+- Admin scoring management interface
+
 ### **Developer Experience**
 - Comprehensive TypeScript interfaces and type safety
 - Clean production builds (zero TypeScript/ESLint errors)
@@ -42,11 +56,12 @@ ESPN API → Games (authoritative) → Match Odds → User Picks → Scoring
 
 ## 🚀 Immediate Priorities
 
-### 1. **Automated Scoring System** (HIGH PRIORITY)
-- Award points for correct picks with configurable rules
-- Real-time leaderboards with live standings calculation
-- Win/loss streak tracking and weekly standings
-- Season completion rollup with historical stats
+### 1. **Automated Scoring System** ✅ COMPLETED
+- ✅ Award points for correct picks with configurable rules
+- ✅ Real-time leaderboards with live standings calculation
+- ✅ Win/loss streak tracking and weekly standings
+- ✅ Season completion rollup with historical stats
+- ✅ **Bonus**: Weekly winner bonuses, admin configuration interface
 
 ### 2. **Pick Management Enhancements**
 - Pick deadline enforcement (prevent picks after game start)
@@ -64,9 +79,9 @@ ESPN API → Games (authoritative) → Match Odds → User Picks → Scoring
 ## 📋 Feature Roadmap
 
 ### **Short Term** (Next 2-4 weeks)
-- [ ] Automated scoring implementation
+- [x] **Automated scoring implementation** ✅
+- [x] **Real-time leaderboards** ✅
 - [ ] Pick deadline enforcement
-- [ ] Real-time leaderboards
 - [ ] Live game score updates
 
 ### **Medium Term** (1-2 months)
@@ -88,7 +103,7 @@ ESPN API → Games (authoritative) → Match Odds → User Picks → Scoring
 ### **Performance & Infrastructure**
 - [ ] Background CRON jobs for data synchronization
 - [ ] Cache optimization and real-time subscriptions
-- [ ] Rate limiting restoration (temporarily disabled for migration)
+- [x] **Rate limiting optimization** ✅ (development-friendly, production-ready)
 - [ ] Progressive Web App (PWA) features
 
 ### **User Experience**
@@ -158,7 +173,12 @@ npm run lint       # ESLint checking
 - `/api/espn/ingest-season` - ESPN season data ingestion
 - `/api/sync-odds` - Odds synchronization with game matching
 - `/api/espn/migrate-schema` - Database schema validation
+- `/api/scoring` - Manual scoring operations (calculate/recalculate)
+- `/api/scoring/auto` - Automated scoring with ESPN integration
+- `/api/scoring-rules` - Configurable scoring rules management
+- `/api/leaderboard` - Season/weekly/league leaderboards
+- `/api/weekly-standings` - Enhanced weekly standings with bonuses
 
 ---
 
-*Last Updated: January 2025 - Post ESPN Architecture Migration*
+*Last Updated: January 2025 - Post Automated Scoring System Implementation*

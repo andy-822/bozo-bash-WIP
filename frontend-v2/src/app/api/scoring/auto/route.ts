@@ -8,6 +8,12 @@ import {
   getCompletedGames,
   type ProcessedGameData,
 } from '@/lib/espn-monitor';
+import {
+  ScoringCalculator,
+  getLeagueScoringRules,
+  recalculateUserSeasonStats,
+  type Pick
+} from '@/lib/scoring';
 
 interface DatabaseGame {
   id: number;
@@ -302,26 +308,49 @@ async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
     return { picksProcessed: 0, pointsAwarded: 0 };
   }
 
-  // 4. Score each pick
+  // 4. Get scoring rules for the season's league
+  const { data: seasonData } = await supabaseAdmin
+    .from('seasons')
+    .select('league_id')
+    .eq('id', (await supabaseAdmin
+      .from('games')
+      .select('season_id')
+      .eq('id', typedDbGame.id)
+      .single()
+    ).data?.season_id)
+    .single();
+
+  const scoringRules = await getLeagueScoringRules(seasonData?.league_id || 1);
+  const calculator = new ScoringCalculator(scoringRules);
+
+  // 5. Score each pick using enhanced calculation
   let pointsAwarded = 0;
   const pickUpdates: Array<{ id: number; result: string; points_awarded: number }> = [];
+  const affectedUsers = new Set<string>();
 
   for (const pick of picks as Pick[]) {
-    const result = calculatePickResult(pick, espnGame);
-    const points = result === 'win' ? 1 : 0;
+    const gameResult = {
+      home_score: espnGame.homeTeam.score,
+      away_score: espnGame.awayTeam.score,
+      status: 'completed'
+    };
+
+    const pickResult = calculator.calculatePick(pick, gameResult);
 
     pickUpdates.push({
       id: pick.id,
-      result,
-      points_awarded: points,
+      result: pickResult.result,
+      points_awarded: pickResult.points,
     });
 
-    if (result === 'win') {
-      pointsAwarded++;
-    }
+    pointsAwarded += pickResult.points;
+    affectedUsers.add(pick.user_id);
+
+    // Log detailed scoring for debugging
+    console.log(`Pick ${pick.id}: ${pick.bet_type} ${pick.selection} -> ${pickResult.result} (${pickResult.points} pts) - ${pickResult.explanation}`);
   }
 
-  // 5. Update all picks in batch
+  // 6. Update all picks in batch
   for (const update of pickUpdates) {
     await supabaseAdmin
       .from('picks')
@@ -332,7 +361,24 @@ async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
       .eq('id', update.id);
   }
 
-  // 6. Create scoring event record
+  // 7. Recalculate user season stats for affected users
+  const { data: gameSeasonData } = await supabaseAdmin
+    .from('games')
+    .select('season_id')
+    .eq('id', typedDbGame.id)
+    .single();
+
+  if (gameSeasonData?.season_id) {
+    for (const userId of affectedUsers) {
+      try {
+        await recalculateUserSeasonStats(userId, gameSeasonData.season_id);
+      } catch (error) {
+        console.error(`Failed to recalculate stats for user ${userId}:`, error);
+      }
+    }
+  }
+
+  // 8. Create scoring event record
   await supabaseAdmin.from('scoring_events').insert({
     game_id: typedDbGame.id,
     espn_game_id: espnGame.espnGameId,
@@ -352,54 +398,3 @@ async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
   };
 }
 
-/**
- * Calculate the result of a pick based on final game scores
- */
-function calculatePickResult(pick: Pick, game: ProcessedGameData): string {
-  const homeScore = game.homeTeam.score;
-  const awayScore = game.awayTeam.score;
-
-  if (homeScore === null || awayScore === null) {
-    return 'pending';
-  }
-
-  switch (pick.bet_type) {
-    case 'moneyline':
-      const winner = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'tie';
-      if (winner === 'tie') return 'push';
-      return pick.selection === winner ? 'win' : 'loss';
-
-    case 'spread':
-      // Selection format: "home -7.5" or "away +3.5"
-      const [team, spreadStr] = pick.selection.split(' ');
-      const spread = parseFloat(spreadStr);
-
-      if (team === 'home') {
-        const homeAdjusted = homeScore + spread;
-        if (homeAdjusted === awayScore) return 'push';
-        return homeAdjusted > awayScore ? 'win' : 'loss';
-      } else {
-        const awayAdjusted = awayScore + spread;
-        if (awayAdjusted === homeScore) return 'push';
-        return awayAdjusted > homeScore ? 'win' : 'loss';
-      }
-
-    case 'total':
-      // Selection format: "over 47.5" or "under 47.5"
-      const [overUnder, totalStr] = pick.selection.split(' ');
-      const total = parseFloat(totalStr);
-      const gameTotal = homeScore + awayScore;
-
-      if (gameTotal === total) return 'push';
-
-      if (overUnder === 'over') {
-        return gameTotal > total ? 'win' : 'loss';
-      } else {
-        return gameTotal < total ? 'win' : 'loss';
-      }
-
-    default:
-      console.warn(`Unknown bet type: ${pick.bet_type}`);
-      return 'pending';
-  }
-}

@@ -12,6 +12,27 @@ export async function rateLimit(
   limit: number = 10,
   windowMs: number = 60000 // 1 minute default
 ): Promise<RateLimitResult> {
+  // Skip rate limiting in development
+  if (process.env.NODE_ENV !== 'production') {
+    return {
+      success: true,
+      limit,
+      remaining: limit - 1,
+      reset: Date.now() + windowMs
+    }
+  }
+
+  // Check if KV is configured for production
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    console.warn('Rate limiting disabled: KV environment variables not configured')
+    return {
+      success: true,
+      limit,
+      remaining: limit - 1,
+      reset: Date.now() + windowMs
+    }
+  }
+
   const key = `rate_limit:${identifier}`
   const window = Math.floor(Date.now() / windowMs)
   const windowKey = `${key}:${window}`

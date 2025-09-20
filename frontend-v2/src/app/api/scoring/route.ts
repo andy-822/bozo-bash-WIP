@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateId } from '@/lib/validation';
+import {
+  ScoringCalculator,
+  getLeagueScoringRules,
+  recalculateUserSeasonStats,
+  type Pick
+} from '@/lib/scoring';
 
 export async function POST(request: NextRequest) {
     try {
@@ -96,51 +102,53 @@ async function calculateGameResults(gameId: number) {
         // Get season and league info for scoring rules
         const { data: season } = await supabaseAdmin
             .from('seasons')
-            .select(`
-                id,
-                league_id,
-                league_scoring_rules(*)
-            `)
+            .select('id, league_id')
             .eq('id', game.season_id)
             .single();
 
-        const scoringRules = season?.league_scoring_rules?.[0] || {
-            points_per_win: 1,
-            points_per_loss: 0,
-            points_per_push: 0
-        };
+        if (!season) {
+            return { error: 'Season not found' };
+        }
+
+        const scoringRules = await getLeagueScoringRules(season.league_id);
+        const calculator = new ScoringCalculator(scoringRules);
 
         let updatedPicks = 0;
         const affectedUsers = new Set<string>();
 
-        // Process each pick
+        // Process each pick using enhanced calculation
         for (const pick of picks) {
-            const result = calculatePickResult(pick, game);
-            const points = result === 'win' ? scoringRules.points_per_win :
-                          result === 'loss' ? scoringRules.points_per_loss :
-                          scoringRules.points_per_push;
+            const gameResult = {
+                home_score: game.home_score,
+                away_score: game.away_score,
+                status: game.status
+            };
+
+            const pickResult = calculator.calculatePick(pick as Pick, gameResult);
 
             // Update the pick with result and points
             const { error: updateError } = await supabaseAdmin
                 .from('picks')
                 .update({
-                    result: result,
-                    points_awarded: points
+                    result: pickResult.result,
+                    points_awarded: pickResult.points
                 })
                 .eq('id', pick.id);
 
             if (!updateError) {
                 updatedPicks++;
                 affectedUsers.add(pick.user_id);
+                console.log(`Manual scoring - Pick ${pick.id}: ${pick.bet_type} ${pick.selection} -> ${pickResult.result} (${pickResult.points} pts) - ${pickResult.explanation}`);
             }
         }
 
-        // Recalculate stats for affected users
+        // Recalculate stats for affected users using enhanced function
         for (const userId of affectedUsers) {
-            await supabaseAdmin.rpc('recalculate_user_season_stats', {
-                p_user_id: userId,
-                p_season_id: game.season_id
-            });
+            try {
+                await recalculateUserSeasonStats(userId, game.season_id);
+            } catch (error) {
+                console.error(`Failed to recalculate stats for user ${userId}:`, error);
+            }
         }
 
         return {
@@ -155,77 +163,32 @@ async function calculateGameResults(gameId: number) {
     }
 }
 
-function calculatePickResult(pick: { bet_type: string; selection: string }, game: { home_score: number | null; away_score: number | null }): string {
-    const homeScore = game.home_score;
-    const awayScore = game.away_score;
-
-    if (homeScore === null || awayScore === null) {
-        return 'pending';
-    }
-
-    if (homeScore === awayScore) {
-        return 'push';
-    }
-
-    switch (pick.bet_type) {
-        case 'moneyline':
-            const winningTeam = homeScore > awayScore ? 'home' : 'away';
-            return pick.selection.toLowerCase().includes(winningTeam) ? 'win' : 'loss';
-
-        case 'spread':
-            // For spreads, selection format should be like "TeamName +3.5" or "TeamName -7"
-            // This is simplified - would need more sophisticated parsing in production
-            const isHomeTeam = pick.selection.toLowerCase().includes('home');
-            const actualSpread = homeScore - awayScore;
-
-            // This is a simplified calculation - you'd want more robust spread parsing
-            if (isHomeTeam) {
-                return actualSpread > 0 ? 'win' : 'loss';
-            } else {
-                return actualSpread < 0 ? 'win' : 'loss';
-            }
-
-        case 'total':
-            const totalPoints = homeScore + awayScore;
-            const isOver = pick.selection.toLowerCase().includes('over');
-
-            // Would need to parse the actual total from the pick selection
-            // This is simplified
-            const threshold = 45; // Would parse from pick.selection
-
-            if (isOver) {
-                return totalPoints > threshold ? 'win' : 'loss';
-            } else {
-                return totalPoints < threshold ? 'win' : 'loss';
-            }
-
-        default:
-            return 'pending';
-    }
-}
 
 async function recalculateSeasonStats(seasonId: number) {
     try {
         // Get all users with picks in this season
         const { data: users, error: usersError } = await supabaseAdmin
             .from('picks')
-            .select('user_id')
+            .select(`
+                user_id,
+                games!inner(season_id)
+            `)
             .eq('games.season_id', seasonId);
 
         if (usersError) {
             return { error: 'Failed to fetch users' };
         }
 
+        // Get unique user IDs
+        const uniqueUserIds = [...new Set(users?.map(u => u.user_id) || [])];
         let recalculatedUsers = 0;
 
-        for (const userRow of users || []) {
-            const { error } = await supabaseAdmin.rpc('recalculate_user_season_stats', {
-                p_user_id: userRow.user_id,
-                p_season_id: seasonId
-            });
-
-            if (!error) {
+        for (const userId of uniqueUserIds) {
+            try {
+                await recalculateUserSeasonStats(userId, seasonId);
                 recalculatedUsers++;
+            } catch (error) {
+                console.error(`Failed to recalculate stats for user ${userId}:`, error);
             }
         }
 
