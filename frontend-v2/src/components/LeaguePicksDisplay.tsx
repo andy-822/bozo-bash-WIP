@@ -112,7 +112,7 @@ export default function LeaguePicksDisplay({ leagueId, currentWeek = 1 }: League
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-4">
           {picks.map((pick) => {
             const gameTime = formatGameTime(pick.games.start_time);
 

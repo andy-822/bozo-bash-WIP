@@ -12,7 +12,8 @@ import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import Leaderboard from '@/components/Leaderboard';
 import { useSeason, useGames, useGamesForWeek } from '@/hooks/useGames';
 import { useUserWeekPicks } from '@/hooks/useUserWeekPicks';
-import { useLeaguePicks } from '@/hooks/usePicks';
+import { useLeaguePicks, useCreatePick } from '@/hooks/usePicks';
+import { useToast } from '@/hooks/use-toast';
 import { useModalStore } from '@/stores/modalStore';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { Game } from '@/types';
@@ -30,6 +31,11 @@ export default function SeasonPage() {
   // UI State
   const [viewState, setViewState] = useState<ViewState>('overview');
   const [selectedGameForDetails, setSelectedGameForDetails] = useState<Game | null>(null);
+
+  // Pick creation state for game details view
+  const [selectedBetType, setSelectedBetType] = useState<'moneyline' | 'spread' | 'total' | null>(null);
+  const [selectedBetOption, setSelectedBetOption] = useState<string | null>(null);
+  const [isSubmittingPick, setIsSubmittingPick] = useState(false);
 
   const {
     pickModalOpen: showPickModal,
@@ -87,6 +93,10 @@ export default function SeasonPage() {
   const userWeekPick = userWeekPicksData?.picks?.[0] || null;
   const leaguePicks = leaguePicksData || [];
 
+  // Pick creation mutation
+  const createPickMutation = useCreatePick();
+  const { toast } = useToast();
+
   const pageLoading = seasonLoading || gamesLoading || weekGamesLoading || userPicksLoading || leaguePicksLoading;
   const error = seasonError || gamesError || weekGamesError;
 
@@ -134,11 +144,67 @@ export default function SeasonPage() {
   const handleGameClick = (game: Game) => {
     setSelectedGameForDetails(game);
     setViewState('game-details');
+    // Reset pick selection state when switching games
+    setSelectedBetType(null);
+    setSelectedBetOption(null);
   };
 
   const handleBackToOverview = () => {
     setViewState('overview');
     setSelectedGameForDetails(null);
+    // Reset pick selection state
+    setSelectedBetType(null);
+    setSelectedBetOption(null);
+  };
+
+  const handleBetSelection = (betType: 'moneyline' | 'spread' | 'total', option: string) => {
+    setSelectedBetType(betType);
+    setSelectedBetOption(option);
+  };
+
+  const handleSubmitPick = async () => {
+    if (!selectedGameForDetails || !selectedBetType || !selectedBetOption) {
+      toast({
+        variant: "destructive",
+        title: "No selection made",
+        description: "Please select a betting option before submitting.",
+      });
+      return;
+    }
+
+    setIsSubmittingPick(true);
+
+    try {
+      await createPickMutation.mutateAsync({
+        game_id: selectedGameForDetails.id,
+        bet_type: selectedBetType,
+        selection: selectedBetOption,
+        week: selectedWeek,
+        season_id: seasonId,
+      });
+
+      toast({
+        title: "Pick submitted successfully!",
+        description: `Your ${selectedBetType} pick has been recorded.`,
+      });
+
+      // Reset selection and go back to overview
+      setSelectedBetType(null);
+      setSelectedBetOption(null);
+      setViewState('overview');
+
+      // Refresh data
+      refetchGames();
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to submit pick",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
+    } finally {
+      setIsSubmittingPick(false);
+    }
   };
 
   const getGameStatusBadge = (game: Game) => {
@@ -328,18 +394,8 @@ export default function SeasonPage() {
           {viewState === 'overview' ? (
             <div className="grid grid-cols-2 gap-6 h-full">
               {/* League Picks Column */}
-              <div>
-                <Card className="h-full">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <GamepadIcon className="h-5 w-5" />
-                      Week {selectedWeek} Picks
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="overflow-y-auto">
-                    <LeaguePicksDisplay leagueId={leagueId} currentWeek={selectedWeek} />
-                  </CardContent>
-                </Card>
+              <div className="overflow-y-auto">
+                <LeaguePicksDisplay leagueId={leagueId} currentWeek={selectedWeek} />
               </div>
 
               {/* Leaderboard Column */}
@@ -378,12 +434,9 @@ export default function SeasonPage() {
                             <h3 className="font-semibold mb-4 text-lg">ML</h3>
                             <div className="space-y-3">
                               <Button
-                                variant="outline"
+                                variant={selectedBetType === 'moneyline' && selectedBetOption === selectedGameForDetails.away_team.name ? 'default' : 'outline'}
                                 className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle moneyline pick for away team
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
+                                onClick={() => handleBetSelection('moneyline', selectedGameForDetails.away_team.name)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
                                 <div className="text-sm text-gray-600">
@@ -396,12 +449,9 @@ export default function SeasonPage() {
                                 </div>
                               </Button>
                               <Button
-                                variant="outline"
+                                variant={selectedBetType === 'moneyline' && selectedBetOption === selectedGameForDetails.home_team.name ? 'default' : 'outline'}
                                 className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle moneyline pick for home team
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
+                                onClick={() => handleBetSelection('moneyline', selectedGameForDetails.home_team.name)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
                                 <div className="text-sm text-gray-600">
@@ -420,42 +470,49 @@ export default function SeasonPage() {
                           <div className="text-center">
                             <h3 className="font-semibold mb-4 text-lg">SP</h3>
                             <div className="space-y-3">
-                              <Button
-                                variant="outline"
-                                className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle spread pick for away team
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
-                              >
-                                <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
-                                <div className="text-sm text-gray-600">
-                                  {selectedGameForDetails.odds[0]?.spread_away !== null && selectedGameForDetails.odds[0]?.spread_away !== undefined ?
-                                    (selectedGameForDetails.odds[0].spread_away > 0 ?
-                                      `+${selectedGameForDetails.odds[0].spread_away}` :
-                                      selectedGameForDetails.odds[0].spread_away
-                                    ) : 'N/A'
-                                  }
-                                </div>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle spread pick for home team
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
-                              >
-                                <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
-                                <div className="text-sm text-gray-600">
-                                  {selectedGameForDetails.odds[0]?.spread_home !== null && selectedGameForDetails.odds[0]?.spread_home !== undefined ?
-                                    (selectedGameForDetails.odds[0].spread_home > 0 ?
-                                      `+${selectedGameForDetails.odds[0].spread_home}` :
-                                      selectedGameForDetails.odds[0].spread_home
-                                    ) : 'N/A'
-                                  }
-                                </div>
-                              </Button>
+                              {(() => {
+                                const awaySpreadSelection = selectedGameForDetails.odds[0]?.spread_away !== null && selectedGameForDetails.odds[0]?.spread_away !== undefined ?
+                                  `${selectedGameForDetails.away_team.name} ${selectedGameForDetails.odds[0].spread_away > 0 ? '+' : ''}${selectedGameForDetails.odds[0].spread_away}` : null;
+                                const homeSpreadSelection = selectedGameForDetails.odds[0]?.spread_home !== null && selectedGameForDetails.odds[0]?.spread_home !== undefined ?
+                                  `${selectedGameForDetails.home_team.name} ${selectedGameForDetails.odds[0].spread_home > 0 ? '+' : ''}${selectedGameForDetails.odds[0].spread_home}` : null;
+
+                                return (
+                                  <>
+                                    <Button
+                                      variant={selectedBetType === 'spread' && selectedBetOption === awaySpreadSelection ? 'default' : 'outline'}
+                                      className="w-full h-auto p-4 flex flex-col"
+                                      onClick={() => awaySpreadSelection && handleBetSelection('spread', awaySpreadSelection)}
+                                      disabled={!awaySpreadSelection}
+                                    >
+                                      <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
+                                      <div className="text-sm text-gray-600">
+                                        {selectedGameForDetails.odds[0]?.spread_away !== null && selectedGameForDetails.odds[0]?.spread_away !== undefined ?
+                                          (selectedGameForDetails.odds[0].spread_away > 0 ?
+                                            `+${selectedGameForDetails.odds[0].spread_away}` :
+                                            selectedGameForDetails.odds[0].spread_away
+                                          ) : 'N/A'
+                                        }
+                                      </div>
+                                    </Button>
+                                    <Button
+                                      variant={selectedBetType === 'spread' && selectedBetOption === homeSpreadSelection ? 'default' : 'outline'}
+                                      className="w-full h-auto p-4 flex flex-col"
+                                      onClick={() => homeSpreadSelection && handleBetSelection('spread', homeSpreadSelection)}
+                                      disabled={!homeSpreadSelection}
+                                    >
+                                      <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
+                                      <div className="text-sm text-gray-600">
+                                        {selectedGameForDetails.odds[0]?.spread_home !== null && selectedGameForDetails.odds[0]?.spread_home !== undefined ?
+                                          (selectedGameForDetails.odds[0].spread_home > 0 ?
+                                            `+${selectedGameForDetails.odds[0].spread_home}` :
+                                            selectedGameForDetails.odds[0].spread_home
+                                          ) : 'N/A'
+                                        }
+                                      </div>
+                                    </Button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 
@@ -463,35 +520,59 @@ export default function SeasonPage() {
                           <div className="text-center">
                             <h3 className="font-semibold mb-4 text-lg">OU</h3>
                             <div className="space-y-3">
-                              <Button
-                                variant="outline"
-                                className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle over pick
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
-                              >
-                                <div className="font-medium">Over</div>
-                                <div className="text-sm text-gray-600">
-                                  {selectedGameForDetails.odds[0]?.total_over || 'N/A'}
-                                </div>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full h-auto p-4 flex flex-col"
-                                onClick={() => {
-                                  // Handle under pick
-                                  handleMakePickClick(selectedGameForDetails);
-                                }}
-                              >
-                                <div className="font-medium">Under</div>
-                                <div className="text-sm text-gray-600">
-                                  {selectedGameForDetails.odds[0]?.total_under || 'N/A'}
-                                </div>
-                              </Button>
+                              {(() => {
+                                const overSelection = selectedGameForDetails.odds[0]?.total_over ? `Over ${selectedGameForDetails.odds[0].total_over}` : null;
+                                const underSelection = selectedGameForDetails.odds[0]?.total_under ? `Under ${selectedGameForDetails.odds[0].total_under}` : null;
+
+                                return (
+                                  <>
+                                    <Button
+                                      variant={selectedBetType === 'total' && selectedBetOption === overSelection ? 'default' : 'outline'}
+                                      className="w-full h-auto p-4 flex flex-col"
+                                      onClick={() => overSelection && handleBetSelection('total', overSelection)}
+                                      disabled={!overSelection}
+                                    >
+                                      <div className="font-medium">Over</div>
+                                      <div className="text-sm text-gray-600">
+                                        {selectedGameForDetails.odds[0]?.total_over || 'N/A'}
+                                      </div>
+                                    </Button>
+                                    <Button
+                                      variant={selectedBetType === 'total' && selectedBetOption === underSelection ? 'default' : 'outline'}
+                                      className="w-full h-auto p-4 flex flex-col"
+                                      onClick={() => underSelection && handleBetSelection('total', underSelection)}
+                                      disabled={!underSelection}
+                                    >
+                                      <div className="font-medium">Under</div>
+                                      <div className="text-sm text-gray-600">
+                                        {selectedGameForDetails.odds[0]?.total_under || 'N/A'}
+                                      </div>
+                                    </Button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
+
+                        {/* Pick Selection Summary */}
+                        {selectedBetType && selectedBetOption && (
+                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <h4 className="font-medium text-blue-900 mb-2">Your Selection:</h4>
+                            <p className="text-blue-800 mb-3">
+                              {selectedBetType === 'moneyline' && `${selectedBetOption} to win`}
+                              {selectedBetType === 'spread' && `${selectedBetOption}`}
+                              {selectedBetType === 'total' && `${selectedBetOption} points`}
+                            </p>
+                            <Button
+                              onClick={handleSubmitPick}
+                              disabled={isSubmittingPick}
+                              className="w-full"
+                            >
+                              {isSubmittingPick ? 'Submitting...' : 'Submit Pick'}
+                            </Button>
+                          </div>
+                        )}
 
                         {/* Odds Source Info */}
                         {selectedGameForDetails.odds[0] && (
