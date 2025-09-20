@@ -90,10 +90,18 @@ const fetchGamesForWeek = async (seasonId: string, week: number): Promise<GamesR
   const allGames = data.games || [];
 
   // Simple week filtering based on game dates
-  // Calculate week based on season start (approximation)
+  // Calculate week based on season start (using 2025 NFL season start date)
   const weekGames = allGames.filter((game: Game) => {
     const gameDate = new Date(game.start_time);
-    const seasonStart = new Date(gameDate.getFullYear(), 8, 5); // Sept 5th
+    const currentYear = gameDate.getFullYear();
+
+    // NFL season start dates: 2025 starts September 4th
+    let seasonStartDay = 5; // Default September 5th
+    if (currentYear === 2025) {
+      seasonStartDay = 4; // September 4th, 2025
+    }
+
+    const seasonStart = new Date(currentYear, 8, seasonStartDay); // September (month is 0-indexed)
     const daysSinceStart = Math.floor((gameDate.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));
     const gameWeek = Math.floor(daysSinceStart / 7) + 1;
     return gameWeek === week;

@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
             .select(`
                 id,
                 game_id,
+                season_id,
                 bet_type,
                 selection,
                 result,
@@ -51,7 +52,6 @@ export async function GET(request: NextRequest) {
                 created_at,
                 games!inner(
                     id,
-                    season_id,
                     start_time,
                     home_team:teams!games_home_team_id_fkey(name, abbreviation),
                     away_team:teams!games_away_team_id_fkey(name, abbreviation)
@@ -76,9 +76,9 @@ export async function GET(request: NextRequest) {
             // If user is admin, query remains unchanged (shows all picks)
         }
 
-        // Filter by season if provided
+        // Filter by season if provided (now using picks.season_id)
         if (seasonId) {
-            query = query.eq('games.season_id', seasonId);
+            query = query.eq('season_id', seasonId);
         }
 
         // Filter by week if provided
@@ -177,25 +177,34 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Get the season and week for this game
-        const { data: gameWithSeason, error: seasonError } = await supabaseAdmin
-            .from('games')
-            .select(`
-                id,
-                start_time,
-                season_id,
-                seasons(id, start_date)
-            `)
-            .eq('id', game_id)
+        // Get the season_id from the request (this should be passed from frontend)
+        const { searchParams } = new URL(request.url);
+        const seasonId = searchParams.get('season_id');
+
+        if (!seasonId) {
+            return NextResponse.json({ error: 'Season ID is required for picks' }, { status: 400 });
+        }
+
+        // Validate season_id to prevent SQL injection
+        const seasonIdValidation = validateId(seasonId, 'Season ID');
+        if (!seasonIdValidation.isValid) {
+            return NextResponse.json({ error: seasonIdValidation.errorMessage }, { status: 400 });
+        }
+
+        // Get the season info to calculate week
+        const { data: season, error: seasonError } = await supabaseAdmin
+            .from('seasons')
+            .select('id, start_date')
+            .eq('id', seasonId)
             .single();
 
-        if (seasonError || !gameWithSeason) {
-            return NextResponse.json({ error: 'Game season not found' }, { status: 404 });
+        if (seasonError || !season) {
+            return NextResponse.json({ error: 'Season not found' }, { status: 404 });
         }
 
         // Calculate week number based on game start time and season start
-        const seasonStart = new Date((gameWithSeason.seasons as unknown as Record<string, unknown>).start_date as string);
-        const gameStart = new Date(gameWithSeason.start_time);
+        const seasonStart = new Date(season.start_date);
+        const gameStart = new Date(game.start_time);
         const weekNumber = Math.ceil((gameStart.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
         // Check for existing pick this week in this season
@@ -204,7 +213,7 @@ export async function POST(request: NextRequest) {
             .select('id, game_id')
             .eq('user_id', user.id)
             .eq('week', weekNumber)
-            .eq('games.season_id', gameWithSeason.season_id)
+            .eq('season_id', seasonId)
             .single();
 
         if (existingError && existingError.code !== 'PGRST116') {
@@ -226,6 +235,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 user_id: user.id,
                 game_id,
+                season_id: seasonId,
                 bet_type,
                 selection,
                 week: weekNumber,

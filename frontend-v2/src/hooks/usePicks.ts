@@ -20,6 +20,7 @@ export interface CreatePickData {
   bet_type: string;
   selection: string;
   week: number;
+  season_id: string;
 }
 
 export interface LeaguePick {
@@ -68,7 +69,7 @@ const fetchLeaguePicks = async (leagueId: string, week: number): Promise<LeagueP
 };
 
 const createPick = async (pickData: CreatePickData): Promise<Pick> => {
-  const response = await fetch('/api/picks', {
+  const response = await fetch(`/api/picks?season_id=${pickData.season_id}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

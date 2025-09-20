@@ -92,7 +92,6 @@ export async function GET(request: NextRequest) {
                 profiles!inner(username),
                 games!inner(
                     id,
-                    season_id,
                     start_time,
                     status,
                     home_team:teams!games_home_team_id_fkey(

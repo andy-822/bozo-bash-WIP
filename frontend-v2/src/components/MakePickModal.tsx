@@ -39,6 +39,7 @@ interface MakePickModalProps {
   onOpenChange: (open: boolean) => void;
   game: Game | null;
   currentWeek: number;
+  seasonId: string;
   onPickSubmitted?: () => void;
 }
 
@@ -50,6 +51,7 @@ export default function MakePickModal({
   onOpenChange,
   game,
   currentWeek,
+  seasonId,
   onPickSubmitted
 }: MakePickModalProps) {
   const [selectedBetType, setSelectedBetType] = useState<BetType | null>(null);
@@ -82,6 +84,7 @@ export default function MakePickModal({
         bet_type: selectedBetType,
         selection: selectedTeam,
         week: currentWeek,
+        season_id: seasonId,
       });
 
       handleClose();

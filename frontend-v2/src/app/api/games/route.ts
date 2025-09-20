@@ -63,105 +63,26 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        // For NFL leagues, show all current NFL games regardless of which season they're stored in
+        // For NFL leagues, show all NFL games (games are now global, not tied to fantasy seasons)
         let games;
         let gamesError;
 
         const sport = Array.isArray(league.sports) ? league.sports[0] : league.sports;
         if (sport.name === 'American Football' || sport.name === 'NFL') {
-            // Find the current NFL season with games
-            const { data: nflSeasonWithGames, error: nflSeasonError } = await supabaseAdmin
-                .from('seasons')
-                .select(`
-                    id,
-                    games(
-                        id,
-                        season_id,
-                        home_team_id,
-                        away_team_id,
-                        start_time,
-                        home_score,
-                        away_score,
-                        status,
-                        home_team:teams!games_home_team_id_fkey(
-                            name,
-                            abbreviation
-                        ),
-                        away_team:teams!games_away_team_id_fkey(
-                            name,
-                            abbreviation
-                        ),
-                        odds(
-                            id,
-                            sportsbook,
-                            last_update,
-                            moneyline_home,
-                            moneyline_away,
-                            spread_home,
-                            spread_away,
-                            total_over,
-                            total_under
-                        )
-                    )
-                `)
-                .eq('name', '2025 NFL Season')
-                .single();
-
-            if (nflSeasonError || !nflSeasonWithGames) {
-                // Fallback to this season's games if no NFL season found
-                const { data: fallbackGames, error: fallbackError } = await supabaseAdmin
-                    .from('games')
-                    .select(`
-                        id,
-                        season_id,
-                        home_team_id,
-                        away_team_id,
-                        start_time,
-                        home_score,
-                        away_score,
-                        status,
-                        home_team:teams!games_home_team_id_fkey(
-                            name,
-                            abbreviation
-                        ),
-                        away_team:teams!games_away_team_id_fkey(
-                            name,
-                            abbreviation
-                        ),
-                        odds(
-                            id,
-                            sportsbook,
-                            last_update,
-                            moneyline_home,
-                            moneyline_away,
-                            spread_home,
-                            spread_away,
-                            total_over,
-                            total_under
-                        )
-                    `)
-                    .eq('season_id', seasonId)
-                    .order('start_time', { ascending: true });
-
-                games = fallbackGames;
-                gamesError = fallbackError;
-            } else {
-                games = nflSeasonWithGames.games;
-                gamesError = null;
-            }
-        } else {
-            // For non-NFL leagues, show only this season's games
-            const { data: seasonGames, error: seasonGamesError } = await supabaseAdmin
+            // Fetch all NFL games from the global games table
+            const { data: nflGames, error: nflGamesError } = await supabaseAdmin
                 .from('games')
                 .select(`
                     id,
-                    season_id,
                     home_team_id,
                     away_team_id,
                     start_time,
                     home_score,
                     away_score,
                     status,
+                    week,
+                    espn_game_id,
+                    venue_name,
                     home_team:teams!games_home_team_id_fkey(
                         name,
                         abbreviation
@@ -182,11 +103,15 @@ export async function GET(request: NextRequest) {
                         total_under
                     )
                 `)
-                .eq('season_id', seasonId)
                 .order('start_time', { ascending: true });
 
-            games = seasonGames;
-            gamesError = seasonGamesError;
+            games = nflGames;
+            gamesError = nflGamesError;
+        } else {
+            // For non-NFL leagues, this would need to be implemented differently
+            // For now, return empty since we're focusing on NFL
+            games = [];
+            gamesError = null;
         }
 
         if (gamesError) {

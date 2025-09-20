@@ -164,7 +164,7 @@ export default function SeasonPage() {
               </span>
               <span className="flex items-center gap-1">
                 <GamepadIcon className="h-4 w-4" />
-                Weeks {currentWeek}-{currentWeek + 1}: {games.length} game{games.length !== 1 ? 's' : ''}
+                Week {currentWeek}: {games.length} game{games.length !== 1 ? 's' : ''}
                 {totalGames > games.length && (
                   <span className="text-gray-500">({totalGames} total)</span>
                 )}
@@ -391,6 +391,7 @@ export default function SeasonPage() {
         onOpenChange={closePickModal}
         game={selectedGame}
         currentWeek={currentWeek}
+        seasonId={seasonId}
         onPickSubmitted={handlePickSubmitted}
       />
     </>
