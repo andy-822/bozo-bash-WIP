@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitGeneral } from './rate-limit';
 
 export async function applyRateLimit(request: NextRequest): Promise<NextResponse | null> {
-    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
     const rateLimitResult = await rateLimitGeneral(ip);
 
     if (!rateLimitResult.success) {

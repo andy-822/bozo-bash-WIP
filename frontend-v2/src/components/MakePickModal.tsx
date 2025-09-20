@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCreatePick } from '@/hooks/usePicks';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,11 @@ interface Game {
   home_team: { name: string; abbreviation: string };
   away_team: { name: string; abbreviation: string };
   start_time: string;
+  espn_game_id?: string;
+  espn_event_name?: string;
+  venue_name?: string;
+  week?: number;
+  status?: string;
   odds: Array<{
     sportsbook: string;
     moneyline_home: number | null;
@@ -50,6 +56,7 @@ export default function MakePickModal({
   const [selectedTeam, setSelectedTeam] = useState<Selection | null>(null);
 
   const createPickMutation = useCreatePick();
+  const { toast } = useToast();
 
   if (!game || !game.odds || game.odds.length === 0) {
     return null;
@@ -81,28 +88,77 @@ export default function MakePickModal({
       onPickSubmitted?.();
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to submit pick');
+      toast({
+        variant: "destructive",
+        title: "Failed to submit pick",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
     }
   };
 
-  const formatOdds = (odds: number | null) => {
-    if (odds === null) return 'N/A';
-    return odds > 0 ? `+${odds}` : `${odds}`;
+  const formatOdds = (odds: number | null, type: 'moneyline' | 'spread' | 'total' = 'moneyline') => {
+    if (odds === null) {
+      // Provide context-specific messaging for different bet types
+      switch (type) {
+        case 'moneyline':
+          return 'No Line'; // Common sportsbook terminology for unavailable moneyline
+        case 'spread':
+          return 'No Spread'; // Indicates spread betting not offered for this game
+        case 'total':
+          return 'No Total'; // Indicates over/under not available
+        default:
+          return 'Unavailable'; // Generic fallback
+      }
+    }
+
+    // Format moneyline odds with + for positive values
+    if (type === 'moneyline') {
+      return odds > 0 ? `+${odds}` : `${odds}`;
+    }
+
+    // Format spread with + for positive values
+    if (type === 'spread') {
+      return odds > 0 ? `+${odds}` : `${odds}`;
+    }
+
+    // Format totals as plain numbers (always positive)
+    return `${odds}`;
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Make Your Week {currentWeek} Pick</DialogTitle>
-          <DialogDescription>
-            {game.away_team.name} @ {game.home_team.name}<br />
-            {gameTime.toLocaleString()}
-            {isPastDeadline && (
-              <span className="text-red-600 font-medium block mt-1">
-                Game has started - picks are locked
+          <DialogTitle>
+            Make Your Week {game.week || currentWeek} Pick
+            {game.espn_game_id && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                ESPN #{game.espn_game_id}
               </span>
             )}
+          </DialogTitle>
+          <DialogDescription>
+            <div className="space-y-1">
+              <div className="font-medium">
+                {game.espn_event_name || `${game.away_team.name} @ ${game.home_team.name}`}
+              </div>
+              <div className="text-sm text-gray-600">
+                {gameTime.toLocaleString()}
+                {game.venue_name && (
+                  <span className="ml-2">at {game.venue_name}</span>
+                )}
+              </div>
+              {game.status && game.status !== 'scheduled' && (
+                <div className="text-xs text-blue-600 font-medium">
+                  Status: {game.status.replace('_', ' ').toUpperCase()}
+                </div>
+              )}
+              {isPastDeadline && (
+                <span className="text-red-600 font-medium block mt-1">
+                  Game has started - picks are locked
+                </span>
+              )}
+            </div>
           </DialogDescription>
         </DialogHeader>
 
@@ -130,7 +186,7 @@ export default function MakePickModal({
                   >
                     <div className="font-medium">{game.away_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {formatOdds(odds.moneyline_away)}
+                      {formatOdds(odds.moneyline_away, 'moneyline')}
                     </div>
                   </Button>
                   <Button
@@ -144,7 +200,7 @@ export default function MakePickModal({
                   >
                     <div className="font-medium">{game.home_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {formatOdds(odds.moneyline_home)}
+                      {formatOdds(odds.moneyline_home, 'moneyline')}
                     </div>
                   </Button>
                 </div>
@@ -169,7 +225,7 @@ export default function MakePickModal({
                   >
                     <div className="font-medium">{game.away_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {odds.spread_away !== null ? `${odds.spread_away > 0 ? '+' : ''}${odds.spread_away}` : 'N/A'}
+                      {formatOdds(odds.spread_away, 'spread')}
                     </div>
                   </Button>
                   <Button
@@ -185,7 +241,7 @@ export default function MakePickModal({
                   >
                     <div className="font-medium">{game.home_team.name}</div>
                     <div className="text-sm text-gray-600">
-                      {odds.spread_home !== null ? `${odds.spread_home > 0 ? '+' : ''}${odds.spread_home}` : 'N/A'}
+                      {formatOdds(odds.spread_home, 'spread')}
                     </div>
                   </Button>
                 </div>
@@ -202,24 +258,28 @@ export default function MakePickModal({
                     className="h-auto p-4 flex flex-col"
                     onClick={() => {
                       setSelectedBetType('total');
-                      setSelectedTeam(`Over ${odds.total_over}`);
+                      if (odds.total_over !== null) {
+                        setSelectedTeam(`Over ${odds.total_over}`);
+                      }
                     }}
                     disabled={!odds.total_over}
                   >
                     <div className="font-medium">Over</div>
-                    <div className="text-sm text-gray-600">{odds.total_over}</div>
+                    <div className="text-sm text-gray-600">{formatOdds(odds.total_over, 'total')}</div>
                   </Button>
                   <Button
                     variant={selectedBetType === 'total' && selectedTeam === `Under ${odds.total_under}` ? 'default' : 'outline'}
                     className="h-auto p-4 flex flex-col"
                     onClick={() => {
                       setSelectedBetType('total');
-                      setSelectedTeam(`Under ${odds.total_under}`);
+                      if (odds.total_under !== null) {
+                        setSelectedTeam(`Under ${odds.total_under}`);
+                      }
                     }}
                     disabled={!odds.total_under}
                   >
                     <div className="font-medium">Under</div>
-                    <div className="text-sm text-gray-600">{odds.total_under}</div>
+                    <div className="text-sm text-gray-600">{formatOdds(odds.total_under, 'total')}</div>
                   </Button>
                 </div>
               </div>

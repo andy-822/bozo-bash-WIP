@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useUserStore } from '@/stores/userStore';
 import { useThemeStore } from '@/stores/themeStore';
 import AppLayout from '@/components/AppLayout';
+import { Toaster } from '@/components/ui/toaster';
 
 function StoreInitializer({ children }: { children: ReactNode }) {
   const initializeUser = useUserStore((state) => state.initialize);
@@ -75,6 +76,7 @@ export default function AppWrapper({ children }: { children: ReactNode }) {
         </AppLayout>
       </StoreInitializer>
       <ReactQueryDevtools initialIsOpen={false} />
+      <Toaster />
     </QueryClientProvider>
   );
 }

@@ -98,9 +98,7 @@ export interface ProcessedGameData {
  */
 export async function fetchESPNScoreboard(week?: number): Promise<ESPNScoreboardResponse> {
   const currentWeek = week || getCurrentNFLWeek();
-  const url = `http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}`;
-
-  console.log(`Fetching ESPN scoreboard for week ${currentWeek}:`, url);
+  const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}`;
 
   const startTime = Date.now();
 
@@ -109,7 +107,6 @@ export async function fetchESPNScoreboard(week?: number): Promise<ESPNScoreboard
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ParlayChallenge/1.0)',
       },
-      // 10 second timeout
       signal: AbortSignal.timeout(10000),
     });
 
@@ -120,16 +117,13 @@ export async function fetchESPNScoreboard(week?: number): Promise<ESPNScoreboard
     const data = await response.json();
     const responseTime = Date.now() - startTime;
 
-    console.log(`ESPN API response received in ${responseTime}ms:`, {
-      gamesFound: data.events?.length || 0,
-      week: data.week?.number,
-      season: data.season?.year,
-    });
+    // Log only essential info
+    console.log(`ESPN week ${currentWeek}: ${data.events?.length || 0} games (${responseTime}ms)`);
 
     return data;
   } catch (error) {
     const responseTime = Date.now() - startTime;
-    console.error(`ESPN API fetch failed after ${responseTime}ms:`, error);
+    console.error(`ESPN API failed for week ${currentWeek} (${responseTime}ms):`, error);
     throw error;
   }
 }
@@ -209,7 +203,6 @@ export async function logESPNAPICall(
 
   try {
     await supabaseAdmin.from('espn_api_calls').insert(logData);
-    console.log('ESPN API call logged:', logData);
   } catch (error) {
     console.error('Failed to log ESPN API call:', error);
   }
@@ -249,7 +242,6 @@ export async function fetchCompleteESPNSeason(): Promise<{
     fetchTime: number;
   };
 }> {
-  console.log('Starting complete season fetch from ESPN (weeks 1-18)...');
   const startTime = Date.now();
 
   const allGames: EnhancedESPNGame[] = [];
@@ -259,7 +251,6 @@ export async function fetchCompleteESPNSeason(): Promise<{
   // Fetch all weeks with small delays to respect rate limits
   for (let week = 1; week <= 18; week++) {
     try {
-      console.log(`Fetching ESPN data for week ${week}/18...`);
 
       const weekData = await fetchESPNScoreboard(week);
       const enhancedGames = processEnhancedESPNGames(weekData);
@@ -267,7 +258,7 @@ export async function fetchCompleteESPNSeason(): Promise<{
       allGames.push(...enhancedGames);
       weeklyBreakdown[week] = enhancedGames.length;
 
-      // Capture season info from first successful response
+      // Capture season info from the first successful response
       if (!seasonInfo && weekData.season) {
         seasonInfo = weekData.season;
       }
@@ -298,7 +289,7 @@ export async function fetchCompleteESPNSeason(): Promise<{
   }
 
   const fetchTime = Date.now() - startTime;
-  console.log(`Complete season fetch finished in ${fetchTime}ms. Total games: ${allGames.length}`);
+  console.log(`ESPN season complete: ${allGames.length} games in ${Math.round(fetchTime/1000)}s`);
 
   return {
     games: allGames,
@@ -347,8 +338,8 @@ export function processEnhancedESPNGames(espnData: ESPNScoreboardResponse): Enha
       startTime: event.date,
       venue: {
         name: competition.venue.fullName,
-        city: competition.venue.address?.city || '',
-        state: competition.venue.address?.state || '',
+        city: (competition.venue as { address?: { city?: string } }).address?.city || '',
+        state: (competition.venue as { address?: { state?: string } }).address?.state || '',
       },
       week: event.week.number,
       season: event.season,

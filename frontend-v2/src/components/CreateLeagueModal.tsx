@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/stores/userStore';
 import { useCreateLeague } from '@/hooks/useLeagues';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
   const [sportsLoading, setSportsLoading] = useState(false);
 
   const createLeagueMutation = useCreateLeague();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
@@ -72,7 +74,11 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
     e.preventDefault();
 
     if (!user) {
-      alert('No authentication found');
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "No authentication found. Please log in and try again.",
+      });
       return;
     }
 
@@ -90,7 +96,11 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
       onLeagueCreated?.();
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to create league');
+      toast({
+        variant: "destructive",
+        title: "Failed to create league",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
     }
   };
 

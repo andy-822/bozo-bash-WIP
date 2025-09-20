@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { rateLimitOddsSync } from '@/lib/rate-limit';
+import {
+  matchOddsGamesToESPNGames,
+  storeGameMatchingResults,
+  OddsSourceGame,
+} from '@/lib/game-matching';
 
 interface OddsApiGame {
   id: string;
@@ -36,137 +41,25 @@ async function fetchNFLGames(): Promise<OddsApiGame[]> {
 
   const response = await fetch(url);
 
-  console.log('Response status:', response.status);
-  console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
   if (!response.ok) {
     const errorText = await response.text();
-    console.log('Error response body:', errorText);
     throw new Error(`Odds API request failed: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json();
-  console.log('API returned data with length:', data.length);
 
   return data;
 }
 
-async function ensureTeamsAndSeason(supabase: typeof supabaseAdmin) {
-  // Ensure we have an NFL sport
-  const { data: nflSport, error: sportError } = await supabase
-    .from('sports')
-    .select('id')
-    .eq('name', 'NFL')
-    .single();
-
-  let finalNflSport = nflSport;
-  if (sportError || !nflSport) {
-    const { data: newSport, error: createSportError } = await supabase
-      .from('sports')
-      .insert({ name: 'NFL' })
-      .select('id')
-      .single();
-
-    if (createSportError) {
-      throw new Error(`Failed to create NFL sport: ${createSportError.message}`);
-    }
-    finalNflSport = newSport;
-  }
-
-  // Find any existing league for NFL to use for seasons
-  // If none exists, we'll use the first available league (this is for system sync)
-  if (!finalNflSport) {
-    throw new Error('NFL sport not found');
-  }
-
-  const { data: availableLeague, error: leagueSearchError } = await supabase
-    .from('leagues')
-    .select('id')
-    .eq('sport_id', finalNflSport.id)
-    .limit(1)
-    .single();
-
-  let leagueId = availableLeague?.id;
-
-  if (leagueSearchError || !availableLeague) {
-    // If no leagues exist for NFL, we need to find any league to use as a placeholder
-    // This is not ideal but works around the foreign key constraint
-    const { data: anyLeague, error: anyLeagueError } = await supabase
-      .from('leagues')
-      .select('id')
-      .limit(1)
-      .single();
-
-    if (anyLeagueError || !anyLeague) {
-      throw new Error('No leagues exist in the system. Please create at least one league first.');
-    }
-    leagueId = anyLeague.id;
-  }
-
-  // Ensure we have a current season
-  const currentYear = new Date().getFullYear();
-  const seasonName = `${currentYear} NFL Season`;
-
-  const { data: season, error: seasonError } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('name', seasonName)
-    .single();
-
-  let finalSeason = season;
-  if (seasonError || !season) {
-    const { data: newSeason, error: createSeasonError } = await supabase
-      .from('seasons')
-      .insert({
-        name: seasonName,
-        league_id: leagueId,
-        start_date: `${currentYear}-09-01`,
-        end_date: `${currentYear + 1}-02-28`
-      })
-      .select('id')
-      .single();
-
-    if (createSeasonError) {
-      throw new Error(`Failed to create season: ${createSeasonError.message}`);
-    }
-    finalSeason = newSeason;
-  }
-
-  return { sportId: finalNflSport!.id, seasonId: finalSeason!.id };
-}
-
-async function ensureTeam(supabase: typeof supabaseAdmin, teamName: string, sportId: number) {
-  const { data: team, error } = await supabase
-    .from('teams')
-    .select('id')
-    .eq('name', teamName)
-    .eq('sport_id', sportId)
-    .single();
-
-  if (error || !team) {
-    const { data: newTeam, error: createError } = await supabase
-      .from('teams')
-      .insert({
-        name: teamName,
-        sport_id: sportId,
-        abbreviation: teamName.substring(0, 3).toUpperCase()
-      })
-      .select('id')
-      .single();
-
-    if (createError) {
-      throw new Error(`Failed to create team ${teamName}: ${createError.message}`);
-    }
-    return newTeam.id;
-  }
-
-  return team.id;
-}
+// NOTE: The ensureTeamsAndSeason and ensureTeam functions have been removed
+// as they are no longer needed in the ESPN-primary architecture.
+// Games and teams are now created via the ESPN season ingestion process,
+// and odds are attached to existing games via the matching algorithm.
 
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
-    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
     const rateLimitResult = await rateLimitOddsSync(ip);
 
     if (!rateLimitResult.success) {
@@ -190,28 +83,18 @@ export async function POST(request: NextRequest) {
                           request.headers.get('x-cron-secret');
 
     if (cronSecret && providedSecret && providedSecret !== cronSecret) {
-      console.warn('Invalid CRON secret provided for odds sync', { ip });
       return NextResponse.json({
         error: 'Unauthorized',
         message: 'Invalid CRON secret'
       }, { status: 401 });
     }
 
-    // If CRON_SECRET is configured but not provided, warn but allow (for backward compatibility)
-    if (cronSecret && !providedSecret) {
-      console.warn('Odds sync called without CRON secret (consider adding authentication)', { ip });
-    }
-
-    console.log('Starting NFL odds sync...');
-
     const supabase = supabaseAdmin;
 
     // Fetch games from The Odds API
     const gamesData = await fetchNFLGames();
-    console.log(`Fetched ${gamesData.length} games from Odds API`);
 
     if (gamesData.length === 0) {
-      console.log('No games returned from Odds API - may be off-season or between weeks');
       return NextResponse.json({
         success: true,
         message: 'Odds sync endpoint is working',
@@ -222,57 +105,44 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Ensure we have the necessary sport and season records
-    const { sportId, seasonId } = await ensureTeamsAndSeason(supabase);
+    // Convert Odds API games to our matching format
+    const oddsSourceGames: OddsSourceGame[] = gamesData.map(game => ({
+      id: game.id,
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      commenceTime: game.commence_time,
+      sport: game.sport_key,
+      source: 'odds_api',
+    }));
 
-    let syncedGames = 0;
+    // NEW ARCHITECTURE: Match odds games to existing ESPN games
+    const matchingResult = await matchOddsGamesToESPNGames(oddsSourceGames, {
+      confidenceThreshold: 70, // Lower threshold for odds sync
+      timeToleranceHours: 12, // More tolerance for odds timing
+      enableFuzzyMatching: true,
+    });
+
+    // Store matching results for monitoring
+    if (matchingResult.matches.length > 0) {
+      await storeGameMatchingResults(matchingResult.matches, 'odds_api');
+    }
+
     let syncedOdds = 0;
+    let attachmentErrors = 0;
 
-    for (const gameData of gamesData) {
+    // Process odds for matched games only
+    for (const match of matchingResult.matches) {
       try {
-        // Ensure both teams exist
-        const homeTeamId = await ensureTeam(supabase, gameData.home_team, sportId);
-        const awayTeamId = await ensureTeam(supabase, gameData.away_team, sportId);
+        const gameId = match.databaseGame.id;
+        const oddsApiGame = gamesData.find(g => g.id === match.oddsGame.id);
 
-        // Check if game already exists
-        const { data: existingGame, error: gameCheckError } = await supabase
-          .from('games')
-          .select('id')
-          .eq('season_id', seasonId)
-          .eq('home_team_id', homeTeamId)
-          .eq('away_team_id', awayTeamId)
-          .eq('start_time', gameData.commence_time)
-          .single();
-
-        let gameId;
-
-        if (gameCheckError || !existingGame) {
-          // Create new game
-          const { data: newGame, error: createGameError } = await supabase
-            .from('games')
-            .insert({
-              season_id: seasonId,
-              home_team_id: homeTeamId,
-              away_team_id: awayTeamId,
-              start_time: gameData.commence_time,
-              status: 'scheduled'
-            })
-            .select('id')
-            .single();
-
-          if (createGameError) {
-            console.error(`Failed to create game: ${createGameError.message}`);
-            continue;
-          }
-
-          gameId = newGame.id;
-          syncedGames++;
-        } else {
-          gameId = existingGame.id;
+        if (!oddsApiGame) {
+          attachmentErrors++;
+          continue;
         }
 
         // Process odds from bookmakers
-        for (const bookmaker of gameData.bookmakers) {
+        for (const bookmaker of oddsApiGame.bookmakers) {
           // Clear existing odds for this game and bookmaker
           await supabase
             .from('odds')
@@ -288,14 +158,14 @@ export async function POST(request: NextRequest) {
           for (const market of bookmaker.markets) {
             if (market.key === 'h2h') {
               // Moneyline
-              const homeOutcome = market.outcomes.find(o => o.name === gameData.home_team);
-              const awayOutcome = market.outcomes.find(o => o.name === gameData.away_team);
+              const homeOutcome = market.outcomes.find(o => o.name === oddsApiGame.home_team);
+              const awayOutcome = market.outcomes.find(o => o.name === oddsApiGame.away_team);
               moneylineHome = homeOutcome?.price || null;
               moneylineAway = awayOutcome?.price || null;
             } else if (market.key === 'spreads') {
               // Point spreads
-              const homeOutcome = market.outcomes.find(o => o.name === gameData.home_team);
-              const awayOutcome = market.outcomes.find(o => o.name === gameData.away_team);
+              const homeOutcome = market.outcomes.find(o => o.name === oddsApiGame.home_team);
+              const awayOutcome = market.outcomes.find(o => o.name === oddsApiGame.away_team);
               spreadHome = homeOutcome?.point || null;
               spreadAway = awayOutcome?.point || null;
             } else if (market.key === 'totals') {
@@ -323,30 +193,49 @@ export async function POST(request: NextRequest) {
             });
 
           if (oddsError) {
-            console.error(`Failed to insert odds: ${oddsError.message}`);
+            attachmentErrors++;
           } else {
             syncedOdds++;
           }
         }
-      } catch (gameError) {
-        console.error(`Error processing game ${gameData.id}:`, gameError);
+      } catch {
+        attachmentErrors++;
         continue;
       }
     }
 
-    console.log(`Sync complete. Games: ${syncedGames}, Odds: ${syncedOdds}`);
+    // Summary logging kept minimal for production monitoring
 
     return NextResponse.json({
       success: true,
-      message: 'NFL odds sync completed',
+      message: 'NFL odds sync completed with ESPN game matching',
       timestamp: new Date().toISOString(),
-      syncedGames,
-      syncedOdds,
+      architecture: 'espn_primary', // Indicate new architecture
+      gameMatching: {
+        totalOddsGames: matchingResult.totalOddsGames,
+        matchedGames: matchingResult.matchedGames,
+        unmatchedGames: matchingResult.unmatchedGames,
+        highConfidenceMatches: matchingResult.highConfidenceMatches,
+        averageConfidence: matchingResult.matches.length > 0
+          ? Math.round(matchingResult.matches.reduce((sum, m) => sum + m.confidence, 0) / matchingResult.matches.length)
+          : 0,
+      },
+      oddsAttachment: {
+        syncedOdds,
+        attachmentErrors,
+        successRate: matchingResult.matchedGames > 0
+          ? Math.round((syncedOdds / (syncedOdds + attachmentErrors)) * 100)
+          : 0,
+      },
+      unmatchedGames: matchingResult.unmatchedOddsGames.map(game => ({
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        commenceTime: game.commenceTime,
+      })),
       totalGamesFromAPI: gamesData.length
     });
 
   } catch (error) {
-    console.error('Sync odds error:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

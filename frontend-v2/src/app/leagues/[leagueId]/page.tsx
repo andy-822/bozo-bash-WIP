@@ -4,7 +4,7 @@ import { useUserStore } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+// Client component using supabase client
 import { Users, Calendar, Trophy } from 'lucide-react';
 import SeasonsManager from '@/components/SeasonsManager';
 import InviteModal from '@/components/InviteModal';

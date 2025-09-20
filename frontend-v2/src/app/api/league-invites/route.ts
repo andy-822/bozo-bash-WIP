@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
 
         // Store invitation in database
-        const { data: invite, error: inviteError } = await supabaseAdmin
+        const { error: inviteError } = await supabaseAdmin
             .from('league_invites')
             .insert({
                 league_id: leagueId,

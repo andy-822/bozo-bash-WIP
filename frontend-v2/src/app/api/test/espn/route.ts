@@ -16,6 +16,11 @@ import { rateLimitGeneral } from '@/lib/rate-limit';
  * GET /api/test/espn?week=3
  */
 export async function GET(request: NextRequest) {
+  // Extract week parameter early for use throughout function
+  const { searchParams } = new URL(request.url);
+  const weekParam = searchParams.get('week');
+  const week = weekParam ? parseInt(weekParam) : getCurrentNFLWeek();
+
   try {
     // Authentication check
     const supabase = await createServerSupabaseClient();
@@ -39,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Rate limiting
-    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
     const rateLimitResult = await rateLimitGeneral(ip);
 
     if (!rateLimitResult.success) {
@@ -56,10 +61,6 @@ export async function GET(request: NextRequest) {
         }
       });
     }
-
-    const { searchParams } = new URL(request.url);
-    const weekParam = searchParams.get('week');
-    const week = weekParam ? parseInt(weekParam) : getCurrentNFLWeek();
 
     console.log(`Testing ESPN integration for week ${week} (User: ${user.id})`);
 

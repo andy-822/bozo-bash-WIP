@@ -32,7 +32,14 @@ export async function GET() {
             .select('league_id')
             .eq('user_id', user.id);
 
-        let memberLeagues = [];
+        let memberLeagues: Array<{
+            id: number;
+            name: string;
+            created_at: string;
+            admin_id: string;
+            sport_id: number;
+            sports: { name: string } | null;
+        }> = [];
         let memberError = null;
 
         if (memberships && memberships.length > 0) {
@@ -50,7 +57,7 @@ export async function GET() {
                 `)
                 .in('id', leagueIds);
 
-            memberLeagues = memberLeagueData || [];
+            memberLeagues = (memberLeagueData || []) as unknown as typeof memberLeagues;
             memberError = memberLeagueError;
         }
 

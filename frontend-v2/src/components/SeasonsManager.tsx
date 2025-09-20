@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import CreateSeasonModal from './CreateSeasonModal';
 import { useSeasons } from '@/hooks/useSeasons';
 import { useModalStore } from '@/stores/modalStore';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface SeasonsManagerProps {
@@ -15,6 +16,7 @@ interface SeasonsManagerProps {
 
 export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProps) {
   const router = useRouter();
+  const { toast } = useToast();
 
   const {
     data: seasons = [],
@@ -53,7 +55,11 @@ export default function SeasonsManager({ leagueId, isAdmin }: SeasonsManagerProp
       // Refresh seasons list
       refetchSeasons();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to delete season');
+      toast({
+        variant: "destructive",
+        title: "Failed to delete season",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
     }
   };
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCreateSeason } from '@/hooks/useSeasons';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export default function CreateSeasonModal({
   });
 
   const createSeasonMutation = useCreateSeason();
+  const { toast } = useToast();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -61,7 +63,11 @@ export default function CreateSeasonModal({
       onSeasonCreated?.();
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to create season');
+      toast({
+        variant: "destructive",
+        title: "Failed to create season",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
     }
   };
 
