@@ -23,6 +23,7 @@ export interface Pick {
   result: string | null;
   points_awarded: number;
   week: number;
+  created_at?: string;
 }
 
 export interface PickResult {

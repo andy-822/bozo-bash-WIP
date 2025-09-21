@@ -76,7 +76,7 @@ export default function SeasonPage() {
     error: weekGamesError,
   } = useGamesForWeek(seasonId, selectedWeek);
 
-  const games = weekGamesData?.games || [];
+  const games: Game[] = weekGamesData?.games || [];
 
   // Auto-refresh for live games
   useEffect(() => {

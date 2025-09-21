@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
         }
 
         // For NFL leagues, show all NFL games (games are now global, not tied to fantasy seasons)
-        let games;
-        let gamesError;
+        let games: Array<{ start_time: string; [key: string]: unknown }> | null;
+        let gamesError: unknown;
 
         const sport = Array.isArray(league.sports) ? league.sports[0] : league.sports;
         if (sport.name === 'NFL' || sport.name === 'American Football') {

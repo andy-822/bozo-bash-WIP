@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
         // If user already has a pick this week, check if we can overwrite it
         if (existingPick) {
             // Check if the existing pick's game has started
-            const existingGameTime = new Date((existingPick.games as any).start_time);
+            const existingGameTime = new Date((existingPick.games as unknown as { start_time: string }).start_time);
             const now = new Date();
 
             if (now >= existingGameTime) {

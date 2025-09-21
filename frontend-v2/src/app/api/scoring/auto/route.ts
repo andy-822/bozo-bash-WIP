@@ -12,7 +12,7 @@ import {
   ScoringCalculator,
   getLeagueScoringRules,
   recalculateUserSeasonStats,
-  type Pick
+  type Pick as ScoringPick
 } from '@/lib/scoring';
 
 interface DatabaseGame {
@@ -27,7 +27,7 @@ interface DatabaseGame {
   };
 }
 
-interface Pick {
+interface DatabasePick {
   id: number;
   user_id: string;
   game_id: number;
@@ -328,10 +328,10 @@ async function processCompletedGame(espnGame: ProcessedGameData): Promise<{
   const pickUpdates: Array<{ id: number; result: string; points_awarded: number }> = [];
   const affectedUsers = new Set<string>();
 
-  for (const pick of picks as Pick[]) {
+  for (const pick of picks as DatabasePick[]) {
     const gameResult = {
-      home_score: espnGame.homeTeam.score,
-      away_score: espnGame.awayTeam.score,
+      home_score: espnGame.homeTeam.score || 0,
+      away_score: espnGame.awayTeam.score || 0,
       status: 'completed'
     };
 

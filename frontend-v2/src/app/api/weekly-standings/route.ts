@@ -121,12 +121,12 @@ export async function GET(request: NextRequest) {
 
     // Aggregate picks by user
     weeklyPicks?.forEach((pick: Record<string, unknown>) => {
-      const userId = pick.user_id;
+      const userId = pick.user_id as string;
       if (!userStats.has(userId)) {
         userStats.set(userId, {
           user_id: userId,
-          username: Array.isArray(pick.profiles) ? pick.profiles[0]?.username : pick.profiles?.username,
-          avatar_url: Array.isArray(pick.profiles) ? pick.profiles[0]?.avatar_url : pick.profiles?.avatar_url,
+          username: Array.isArray(pick.profiles) ? (pick.profiles[0] as {username?: string})?.username || 'Unknown' : (pick.profiles as {username?: string})?.username || 'Unknown',
+          avatar_url: Array.isArray(pick.profiles) ? (pick.profiles[0] as {avatar_url?: string})?.avatar_url || undefined : (pick.profiles as {avatar_url?: string})?.avatar_url || undefined,
           total_picks: 0,
           wins: 0,
           losses: 0,
@@ -138,11 +138,11 @@ export async function GET(request: NextRequest) {
 
       const stats = userStats.get(userId)!;
       stats.total_picks++;
-      stats.base_points += pick.points_awarded || 0;
+      stats.base_points += (pick.points_awarded as number) || 0;
       stats.picks.push({
-        result: pick.result,
-        created_at: pick.created_at,
-        points_awarded: pick.points_awarded || 0
+        result: pick.result as string,
+        created_at: pick.created_at as string,
+        points_awarded: (pick.points_awarded as number) || 0
       });
 
       if (pick.result === 'win') stats.wins++;

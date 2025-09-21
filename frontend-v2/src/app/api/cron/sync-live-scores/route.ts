@@ -95,7 +95,16 @@ export async function POST(request: NextRequest) {
       }
 
       // Prepare update data
-      const updateData: any = {
+      const updateData: {
+        home_score: number;
+        away_score: number;
+        clock: number;
+        display_clock: string;
+        period: number;
+        status_detail: string;
+        last_updated: string;
+        status?: string;
+      } = {
         home_score: parseInt(homeCompetitor.score) || 0,
         away_score: parseInt(awayCompetitor.score) || 0,
         clock: status.clock || 0,
