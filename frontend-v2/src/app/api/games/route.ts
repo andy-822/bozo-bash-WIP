@@ -122,20 +122,6 @@ export async function GET(request: NextRequest) {
 
         let filteredGames = games || [];
 
-        // Debug logging
-        console.log('DEBUG - Games API:', {
-            totalGamesFromDB: games?.length || 0,
-            currentWeek,
-            weekParam: week,
-            sportName: sport?.name,
-            firstFewGames: games?.slice(0, 3).map(g => ({
-                id: g.id,
-                week: g.week,
-                start_time: g.start_time,
-                home_team: g.home_team?.abbreviation,
-                away_team: g.away_team?.abbreviation
-            }))
-        });
 
         if (week) {
             // Filter by specific week using date ranges
@@ -156,28 +142,11 @@ export async function GET(request: NextRequest) {
             ) || [];
         }
 
-        console.log('DEBUG - After filtering:', {
-            filteredGamesCount: filteredGames.length,
-            weekFilter: week || 'current week only',
-            dateRange: week ? (() => {
-                const weekNum = parseInt(week);
-                if (weekNum && !isNaN(weekNum)) {
-                    const { start, end } = getNFLWeekDateRange(weekNum);
-                    return { start: start.toISOString(), end: end.toISOString() };
-                }
-                return null;
-            })() : 'current week range'
-        });
 
         return NextResponse.json({
             games: filteredGames,
             currentWeek,
-            totalGames: games?.length || 0,
-            debug: {
-                totalFromDB: games?.length || 0,
-                afterFiltering: filteredGames.length,
-                sportName: sport?.name
-            }
+            totalGames: games?.length || 0
         });
 
     } catch (err) {

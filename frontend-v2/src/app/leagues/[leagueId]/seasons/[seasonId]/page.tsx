@@ -411,7 +411,7 @@ export default function SeasonPage() {
               </div>
             </div>
           ) : (
-            /* Game Details View */
+            /* Game Details View *//* Game Details View */
             selectedGameForDetails && (
               <div className="max-w-2xl mx-auto">
                 <Card>
