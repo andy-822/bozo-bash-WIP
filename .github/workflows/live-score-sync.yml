@@ -43,7 +43,7 @@ jobs:
 
       - name: Upload Response Log
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: live-score-sync-response
           path: response.json
