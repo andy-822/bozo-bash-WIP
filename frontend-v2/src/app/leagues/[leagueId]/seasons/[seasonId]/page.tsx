@@ -10,6 +10,8 @@ import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight, ArrowLef
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import Leaderboard from '@/components/Leaderboard';
+import { ThemeSelector } from '@/components/ThemeSelector';
+import { initializeTheme } from '@/lib/theme';
 import { useSeason, useGames, useGamesForWeek } from '@/hooks/useGames';
 import { useUserWeekPicks } from '@/hooks/useUserWeekPicks';
 import { useLeaguePicks, useCreatePick } from '@/hooks/usePicks';
@@ -27,6 +29,11 @@ export default function SeasonPage() {
   const params = useParams();
   const leagueId = params.leagueId as string;
   const seasonId = params.seasonId as string;
+
+  // Initialize theme on component mount
+  useEffect(() => {
+    initializeTheme();
+  }, []);
 
   // UI State
   const [viewState, setViewState] = useState<ViewState>('overview');
@@ -225,11 +232,11 @@ export default function SeasonPage() {
 
   const getGameStatusBadge = (game: Game) => {
     if (game.status === 'completed') {
-      return <Badge variant="default" className="bg-green-100 text-green-800">Final</Badge>;
+      return <Badge variant="default" className="bg-success/10 text-success border-success/20">Final</Badge>;
     }
     if (game.status === 'live') {
       return (
-        <Badge variant="default" className="bg-red-100 text-red-800 animate-pulse">
+        <Badge variant="default" className="bg-live-pulse/10 text-live-pulse border-live-pulse/20 animate-pulse">
           🔴 Live
         </Badge>
       );
@@ -254,7 +261,7 @@ export default function SeasonPage() {
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -268,7 +275,7 @@ export default function SeasonPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Error</h2>
-          <p className="text-gray-600 mb-4">{error.message}</p>
+          <p className="text-muted-foreground mb-4">{error.message}</p>
           <Button onClick={() => router.push(`/leagues/${leagueId}`)}>
             Back to League
           </Button>
@@ -282,11 +289,11 @@ export default function SeasonPage() {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-background text-foreground">
       {/* Left Sidebar */}
-      <div className="w-80  border-r border-gray-200 flex flex-col">
+      <div className="w-80 border-r border-border bg-card flex flex-col">
         {/* Sidebar Header with Week Selector */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-border bg-card text-card-foreground">
           <h2 className="text-lg font-semibold mb-3">Week {selectedWeek}</h2>
           <div className="flex items-center gap-2">
             <Button
@@ -298,7 +305,7 @@ export default function SeasonPage() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <span className="text-sm text-gray-600 min-w-[60px] text-center">
+            <span className="text-sm text-muted-foreground min-w-[60px] text-center">
               Week {selectedWeek}
             </span>
 
@@ -328,8 +335,8 @@ export default function SeasonPage() {
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {games.length === 0 ? (
             <div className="text-center py-8">
-              <GamepadIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600">No games this week</p>
+              <GamepadIcon className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No games this week</p>
             </div>
           ) : (
             games.map((game) => {
@@ -344,18 +351,18 @@ export default function SeasonPage() {
               return (
                 <Card
                   key={game.id}
-                  className={`cursor-pointer transition-colors hover:bg-gray-50 ${
-                    selectedGameForDetails?.id === game.id ? 'ring-2 ring-blue-500' : ''
-                  } ${userPicked ? 'border-green-200 bg-green-50' : ''} ${
-                    isLive ? 'border-red-200 bg-red-50' : ''
-                  } ${gameStarted && !pickingAllowed ? 'opacity-60 border-gray-300' : ''}`}
+                  className={`cursor-pointer transition-colors hover:bg-accent bg-card text-card-foreground border-border ${
+                    selectedGameForDetails?.id === game.id ? 'ring-2 ring-primary' : ''
+                  } ${userPicked ? 'border-success/30 bg-success/5' : ''} ${
+                    isLive ? 'border-live-pulse/30 bg-live-pulse/5' : ''
+                  } ${gameStarted && !pickingAllowed ? 'opacity-60' : ''}`}
                   onClick={() => handleGameClick(game)}
                 >
                   <CardContent className="p-3">
                     <div className="flex justify-between items-start mb-2">
                       <div className="text-sm">
                         <div className="font-medium">{game.away_team.abbreviation}</div>
-                        <div className="text-gray-500 text-xs">@</div>
+                        <div className="text-muted-foreground text-xs">@</div>
                         <div className="font-medium">{game.home_team.abbreviation}</div>
                       </div>
                       {getGameStatusBadge(game)}
@@ -372,21 +379,21 @@ export default function SeasonPage() {
                               {game.display_clock && game.display_clock !== '0:00' ? game.display_clock : 'Live'}
                             </div>
                             {game.status_detail && (
-                              <div className="text-gray-600">{game.status_detail}</div>
+                              <div className="text-muted-foreground">{game.status_detail}</div>
                             )}
                           </div>
                         ) : isCompleted ? (
                           <div className="text-xs text-green-600">Final</div>
                         ) : (
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-muted-foreground">
                             {game.status_detail || 'Scheduled'}
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="text-center">
-                        <div className="text-xs text-gray-600">{gameTime.date}</div>
-                        <div className="text-xs text-gray-500">{gameTime.time}</div>
+                        <div className="text-xs text-muted-foreground">{gameTime.date}</div>
+                        <div className="text-xs text-muted-foreground">{gameTime.time}</div>
                       </div>
                     )}
 
@@ -401,7 +408,7 @@ export default function SeasonPage() {
 
                     {gameStarted && !pickingAllowed && !userPicked && (
                       <div className="mt-2 flex items-center justify-center">
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           🔒 Picks closed
                         </div>
                       </div>
@@ -417,11 +424,11 @@ export default function SeasonPage() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b border-gray-200 p-6">
+        <div className="border-b border-border p-6 bg-card">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">{season.name}</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+              <h1 className="text-2xl font-bold text-card-foreground">{season.name}</h1>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   {season.start_date || season.end_date ? (
@@ -439,12 +446,15 @@ export default function SeasonPage() {
               </div>
             </div>
 
-            {viewState === 'game-details' && (
-              <Button variant="outline" onClick={handleBackToOverview}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Overview
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              <ThemeSelector />
+              {viewState === 'game-details' && (
+                <Button variant="outline" onClick={handleBackToOverview}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Overview
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -482,14 +492,14 @@ export default function SeasonPage() {
 
                     {/* Live Score Display */}
                     {selectedGameForDetails.home_score !== null && selectedGameForDetails.away_score !== null ? (
-                      <div className="my-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="my-4 p-4 bg-muted rounded-lg">
                         <div className="grid grid-cols-3 items-center gap-4">
                           <div className="text-center">
                             <div className="font-medium text-lg">{selectedGameForDetails.away_team.abbreviation}</div>
                             <div className="text-2xl font-bold">{selectedGameForDetails.away_score}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-sm text-gray-500">vs</div>
+                            <div className="text-sm text-muted-foreground">vs</div>
                             {selectedGameForDetails.status === 'live' ? (
                               <div className="space-y-1">
                                 <div className="text-red-600 font-bold">
@@ -499,7 +509,7 @@ export default function SeasonPage() {
                                   }
                                 </div>
                                 {selectedGameForDetails.status_detail && (
-                                  <div className="text-xs text-gray-600">
+                                  <div className="text-xs text-muted-foreground">
                                     {selectedGameForDetails.status_detail}
                                   </div>
                                 )}
@@ -507,7 +517,7 @@ export default function SeasonPage() {
                             ) : selectedGameForDetails.status === 'completed' ? (
                               <div className="text-green-600 font-medium">FINAL</div>
                             ) : (
-                              <div className="text-xs text-gray-600">
+                              <div className="text-xs text-muted-foreground">
                                 {selectedGameForDetails.status_detail || 'Scheduled'}
                               </div>
                             )}
@@ -519,7 +529,7 @@ export default function SeasonPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-600 mt-2">
+                      <div className="text-sm text-muted-foreground mt-2">
                         {formatGameTime(selectedGameForDetails.start_time).date} at {formatGameTime(selectedGameForDetails.start_time).time}
                       </div>
                     )}
@@ -557,7 +567,7 @@ export default function SeasonPage() {
                                 disabled={!canMakePick(selectedGameForDetails)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-muted-foreground">
                                   {selectedGameForDetails.odds[0]?.moneyline_away ?
                                     (selectedGameForDetails.odds[0].moneyline_away > 0 ?
                                       `+${selectedGameForDetails.odds[0].moneyline_away}` :
@@ -573,7 +583,7 @@ export default function SeasonPage() {
                                 disabled={!canMakePick(selectedGameForDetails)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-muted-foreground">
                                   {selectedGameForDetails.odds[0]?.moneyline_home ?
                                     (selectedGameForDetails.odds[0].moneyline_home > 0 ?
                                       `+${selectedGameForDetails.odds[0].moneyline_home}` :
@@ -604,7 +614,7 @@ export default function SeasonPage() {
                                       disabled={!awaySpreadSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm text-muted-foreground">
                                         {selectedGameForDetails.odds[0]?.spread_away !== null && selectedGameForDetails.odds[0]?.spread_away !== undefined ?
                                           (selectedGameForDetails.odds[0].spread_away > 0 ?
                                             `+${selectedGameForDetails.odds[0].spread_away}` :
@@ -620,7 +630,7 @@ export default function SeasonPage() {
                                       disabled={!homeSpreadSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm text-muted-foreground">
                                         {selectedGameForDetails.odds[0]?.spread_home !== null && selectedGameForDetails.odds[0]?.spread_home !== undefined ?
                                           (selectedGameForDetails.odds[0].spread_home > 0 ?
                                             `+${selectedGameForDetails.odds[0].spread_home}` :
@@ -652,7 +662,7 @@ export default function SeasonPage() {
                                       disabled={!overSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">Over</div>
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm text-muted-foreground">
                                         {selectedGameForDetails.odds[0]?.total_over || 'N/A'}
                                       </div>
                                     </Button>
@@ -663,7 +673,7 @@ export default function SeasonPage() {
                                       disabled={!underSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">Under</div>
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm text-muted-foreground">
                                         {selectedGameForDetails.odds[0]?.total_under || 'N/A'}
                                       </div>
                                     </Button>
@@ -696,7 +706,7 @@ export default function SeasonPage() {
 
                         {/* Odds Source Info */}
                         {selectedGameForDetails.odds[0] && (
-                          <div className="text-center text-xs text-gray-500 pt-4 border-t">
+                          <div className="text-center text-xs text-muted-foreground pt-4 border-t">
                             Odds from {selectedGameForDetails.odds[0].sportsbook} •
                             Updated {new Date(selectedGameForDetails.odds[0].last_update).toLocaleTimeString()}
                           </div>
@@ -704,7 +714,7 @@ export default function SeasonPage() {
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-gray-600">No odds available for this game</p>
+                        <p className="text-muted-foreground">No odds available for this game</p>
                       </div>
                     )}
                   </CardContent>

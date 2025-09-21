@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { ESPNGame, ESPNGameStatus, ESPNCompetitor } from '@/lib/espn-monitor';
+import { ESPNGame, ESPNGameStatus, ESPNCompetitor, updateTeamInformationFromESPN } from '@/lib/espn-monitor';
 
 /**
  * Live Score Sync API
@@ -56,6 +56,11 @@ export async function POST(request: NextRequest) {
     const espnEvents: ESPNGame[] = espnData.events || [];
 
     console.log(`Fetched ${espnEvents.length} games from ESPN`);
+
+    // Update team information from ESPN data (async, don't block scoring)
+    updateTeamInformationFromESPN(espnData).catch(error => {
+      console.error('Failed to update team information:', error);
+    });
 
     // Step 3: Process each live game
     let updatedCount = 0;

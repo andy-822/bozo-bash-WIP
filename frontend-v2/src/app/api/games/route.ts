@@ -90,11 +90,21 @@ export async function GET(request: NextRequest) {
                     venue_name,
                     home_team:teams!games_home_team_id_fkey(
                         name,
-                        abbreviation
+                        abbreviation,
+                        primary_color,
+                        alternate_color,
+                        logo_url,
+                        current_record,
+                        venue_name
                     ),
                     away_team:teams!games_away_team_id_fkey(
                         name,
-                        abbreviation
+                        abbreviation,
+                        primary_color,
+                        alternate_color,
+                        logo_url,
+                        current_record,
+                        venue_name
                     ),
                     odds(
                         id,

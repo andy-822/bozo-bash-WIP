@@ -27,10 +27,20 @@ export interface Game {
   home_team: {
     name: string;
     abbreviation: string;
+    primary_color?: string;
+    alternate_color?: string;
+    logo_url?: string;
+    current_record?: string;
+    venue_name?: string;
   };
   away_team: {
     name: string;
     abbreviation: string;
+    primary_color?: string;
+    alternate_color?: string;
+    logo_url?: string;
+    current_record?: string;
+    venue_name?: string;
   };
   odds: Odds[];
 }

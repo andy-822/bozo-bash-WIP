@@ -12,8 +12,45 @@ export interface ESPNCompetitor {
     displayName: string;
     name: string;
     location: string;
+    color?: string;
+    alternateColor?: string;
+    logo?: string;
+    venue?: {
+      id: string;
+      fullName?: string;
+    };
+    links?: Array<{
+      rel: string[];
+      href: string;
+      text: string;
+    }>;
   };
   score: string;
+  records?: Array<{
+    name: string;
+    type: string;
+    summary: string;
+  }>;
+  leaders?: Array<{
+    name: string;
+    displayName: string;
+    abbreviation: string;
+    leaders: Array<{
+      displayValue: string;
+      value: number;
+      athlete: {
+        id: string;
+        fullName: string;
+        displayName: string;
+        shortName: string;
+        headshot?: string;
+        jersey?: string;
+        position: {
+          abbreviation: string;
+        };
+      };
+    }>;
+  }>;
 }
 
 export interface ESPNGameStatus {
@@ -159,6 +196,120 @@ export function processESPNGames(espnData: ESPNScoreboardResponse): ProcessedGam
       startTime: event.date,
     };
   });
+}
+
+/**
+ * Extract and update team information from ESPN data
+ */
+export async function updateTeamInformationFromESPN(espnData: ESPNScoreboardResponse): Promise<void> {
+  if (!espnData.events || espnData.events.length === 0) {
+    return;
+  }
+
+  const teamUpdates = new Map<string, any>();
+
+  // Collect all unique teams from all games
+  for (const event of espnData.events) {
+    const competition = event.competitions[0];
+
+    for (const competitor of competition.competitors) {
+      const team = competitor.team;
+      const teamAbbr = team.abbreviation;
+
+      if (!teamUpdates.has(teamAbbr)) {
+        teamUpdates.set(teamAbbr, {
+          abbreviation: teamAbbr,
+          espn_team_id: team.id,
+          primary_color: team.color ? `#${team.color}` : null,
+          alternate_color: team.alternateColor ? `#${team.alternateColor}` : null,
+          logo_url: team.logo || null,
+          venue_name: team.venue?.fullName || competition.venue?.fullName || null,
+          venue_id: team.venue?.id || competition.venue?.id || null,
+          current_record: competitor.records?.find(r => r.name === 'overall')?.summary || null,
+          home_record: competitor.records?.find(r => r.type === 'home')?.summary || null,
+          away_record: competitor.records?.find(r => r.type === 'road')?.summary || null,
+          last_updated: new Date().toISOString(),
+        });
+
+        // Store team stats/leaders for separate processing
+        if (competitor.leaders && competitor.leaders.length > 0) {
+          teamUpdates.get(teamAbbr)!.leaders = competitor.leaders;
+        }
+      }
+    }
+  }
+
+  // Update teams in database
+  for (const [abbreviation, teamData] of teamUpdates) {
+    try {
+      // Update team information
+      const { data: updatedTeam, error: teamError } = await supabaseAdmin
+        .from('teams')
+        .update({
+          espn_team_id: teamData.espn_team_id,
+          primary_color: teamData.primary_color,
+          alternate_color: teamData.alternate_color,
+          logo_url: teamData.logo_url,
+          venue_name: teamData.venue_name,
+          venue_id: teamData.venue_id,
+          current_record: teamData.current_record,
+          home_record: teamData.home_record,
+          away_record: teamData.away_record,
+          last_updated: teamData.last_updated,
+        })
+        .eq('abbreviation', abbreviation)
+        .select('id')
+        .single();
+
+      if (teamError) {
+        console.error(`Failed to update team ${abbreviation}:`, teamError);
+        continue;
+      }
+
+      // Update team statistical leaders if available
+      if (teamData.leaders && updatedTeam) {
+        await updateTeamStatistics(updatedTeam.id, teamData.leaders);
+      }
+
+    } catch (error) {
+      console.error(`Error processing team ${abbreviation}:`, error);
+    }
+  }
+
+  console.log(`Updated ${teamUpdates.size} teams with ESPN data`);
+}
+
+/**
+ * Update team statistical leaders in database
+ */
+async function updateTeamStatistics(teamId: number, leaders: any[]): Promise<void> {
+  for (const leader of leaders) {
+    if (!leader.leaders || leader.leaders.length === 0) continue;
+
+    const topLeader = leader.leaders[0]; // Get the top performer
+    const athlete = topLeader.athlete;
+
+    try {
+      await supabaseAdmin
+        .from('team_stats')
+        .upsert({
+          team_id: teamId,
+          stat_type: leader.name, // 'passingLeader', 'rushingLeader', 'receivingLeader'
+          athlete_id: athlete.id,
+          athlete_name: athlete.fullName,
+          athlete_position: athlete.position?.abbreviation,
+          athlete_jersey: athlete.jersey,
+          athlete_headshot: athlete.headshot,
+          display_value: topLeader.displayValue,
+          numeric_value: topLeader.value,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'team_id,stat_type',
+        });
+    } catch (error) {
+      console.error(`Failed to update team stats for team ${teamId}:`, error);
+    }
+  }
 }
 
 /**
