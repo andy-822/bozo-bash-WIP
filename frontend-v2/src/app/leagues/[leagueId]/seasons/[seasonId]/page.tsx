@@ -241,6 +241,16 @@ export default function SeasonPage() {
     return leaguePicks.some(pick => pick.game_id === gameId && pick.user_id === user?.id);
   };
 
+  const isGameStarted = (game: Game) => {
+    const gameTime = new Date(game.start_time);
+    const now = new Date();
+    return now >= gameTime;
+  };
+
+  const canMakePick = (game: Game) => {
+    return !isGameStarted(game) && game.status !== 'live' && game.status !== 'completed';
+  };
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -328,6 +338,8 @@ export default function SeasonPage() {
               const isLive = game.status === 'live';
               const hasScores = game.home_score !== null && game.away_score !== null;
               const userPicked = hasUserPickedGame(game.id);
+              const gameStarted = isGameStarted(game);
+              const pickingAllowed = canMakePick(game);
 
               return (
                 <Card
@@ -336,7 +348,7 @@ export default function SeasonPage() {
                     selectedGameForDetails?.id === game.id ? 'ring-2 ring-blue-500' : ''
                   } ${userPicked ? 'border-green-200 bg-green-50' : ''} ${
                     isLive ? 'border-red-200 bg-red-50' : ''
-                  }`}
+                  } ${gameStarted && !pickingAllowed ? 'opacity-60 border-gray-300' : ''}`}
                   onClick={() => handleGameClick(game)}
                 >
                   <CardContent className="p-3">
@@ -383,6 +395,14 @@ export default function SeasonPage() {
                         <div className="flex items-center gap-1 text-xs text-green-700">
                           <CheckCircle className="h-3 w-3" />
                           Picked
+                        </div>
+                      </div>
+                    )}
+
+                    {gameStarted && !pickingAllowed && !userPicked && (
+                      <div className="mt-2 flex items-center justify-center">
+                        <div className="text-xs text-gray-500">
+                          🔒 Picks closed
                         </div>
                       </div>
                     )}
@@ -507,6 +527,23 @@ export default function SeasonPage() {
                   <CardContent>
                     {selectedGameForDetails.odds && selectedGameForDetails.odds.length > 0 ? (
                       <div className="space-y-6">
+                        {/* Deadline Warning */}
+                        {!canMakePick(selectedGameForDetails) && (
+                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="text-yellow-600">🔒</span>
+                              <div className="text-sm text-yellow-800">
+                                <div className="font-medium">Picks are closed for this game</div>
+                                <div className="text-xs">
+                                  {isGameStarted(selectedGameForDetails)
+                                    ? 'Game has already started'
+                                    : 'Game is live or completed'
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {/* Betting Options Grid */}
                         <div className="grid grid-cols-3 gap-6">
                           {/* Money Line Column */}
@@ -517,6 +554,7 @@ export default function SeasonPage() {
                                 variant={selectedBetType === 'moneyline' && selectedBetOption === selectedGameForDetails.away_team.name ? 'default' : 'outline'}
                                 className="w-full h-auto p-4 flex flex-col"
                                 onClick={() => handleBetSelection('moneyline', selectedGameForDetails.away_team.name)}
+                                disabled={!canMakePick(selectedGameForDetails)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
                                 <div className="text-sm text-gray-600">
@@ -532,6 +570,7 @@ export default function SeasonPage() {
                                 variant={selectedBetType === 'moneyline' && selectedBetOption === selectedGameForDetails.home_team.name ? 'default' : 'outline'}
                                 className="w-full h-auto p-4 flex flex-col"
                                 onClick={() => handleBetSelection('moneyline', selectedGameForDetails.home_team.name)}
+                                disabled={!canMakePick(selectedGameForDetails)}
                               >
                                 <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
                                 <div className="text-sm text-gray-600">
@@ -562,7 +601,7 @@ export default function SeasonPage() {
                                       variant={selectedBetType === 'spread' && selectedBetOption === awaySpreadSelection ? 'default' : 'outline'}
                                       className="w-full h-auto p-4 flex flex-col"
                                       onClick={() => awaySpreadSelection && handleBetSelection('spread', awaySpreadSelection)}
-                                      disabled={!awaySpreadSelection}
+                                      disabled={!awaySpreadSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">{selectedGameForDetails.away_team.abbreviation}</div>
                                       <div className="text-sm text-gray-600">
@@ -578,7 +617,7 @@ export default function SeasonPage() {
                                       variant={selectedBetType === 'spread' && selectedBetOption === homeSpreadSelection ? 'default' : 'outline'}
                                       className="w-full h-auto p-4 flex flex-col"
                                       onClick={() => homeSpreadSelection && handleBetSelection('spread', homeSpreadSelection)}
-                                      disabled={!homeSpreadSelection}
+                                      disabled={!homeSpreadSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">{selectedGameForDetails.home_team.abbreviation}</div>
                                       <div className="text-sm text-gray-600">
@@ -610,7 +649,7 @@ export default function SeasonPage() {
                                       variant={selectedBetType === 'total' && selectedBetOption === overSelection ? 'default' : 'outline'}
                                       className="w-full h-auto p-4 flex flex-col"
                                       onClick={() => overSelection && handleBetSelection('total', overSelection)}
-                                      disabled={!overSelection}
+                                      disabled={!overSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">Over</div>
                                       <div className="text-sm text-gray-600">
@@ -621,7 +660,7 @@ export default function SeasonPage() {
                                       variant={selectedBetType === 'total' && selectedBetOption === underSelection ? 'default' : 'outline'}
                                       className="w-full h-auto p-4 flex flex-col"
                                       onClick={() => underSelection && handleBetSelection('total', underSelection)}
-                                      disabled={!underSelection}
+                                      disabled={!underSelection || !canMakePick(selectedGameForDetails)}
                                     >
                                       <div className="font-medium">Under</div>
                                       <div className="text-sm text-gray-600">
@@ -646,10 +685,11 @@ export default function SeasonPage() {
                             </p>
                             <Button
                               onClick={handleSubmitPick}
-                              disabled={isSubmittingPick}
+                              disabled={isSubmittingPick || !canMakePick(selectedGameForDetails)}
                               className="w-full"
                             >
-                              {isSubmittingPick ? 'Submitting...' : 'Submit Pick'}
+                              {isSubmittingPick ? 'Submitting...' :
+                               !canMakePick(selectedGameForDetails) ? 'Picks Closed' : 'Submit Pick'}
                             </Button>
                           </div>
                         )}
