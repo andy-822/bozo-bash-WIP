@@ -78,6 +78,22 @@ export default function SeasonPage() {
 
   const games = weekGamesData?.games || [];
 
+  // Auto-refresh for live games
+  useEffect(() => {
+    // Check if there are any live games
+    const hasLiveGames = games.some(game => game.status === 'live');
+
+    if (!hasLiveGames) return;
+
+    // Set up polling interval for live games (every 30 seconds)
+    const interval = setInterval(() => {
+      console.log('Refreshing live game data...');
+      refetchGames();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [games, refetchGames]);
+
   // Get user's picks for the selected week
   const {
     data: userWeekPicksData,
@@ -212,7 +228,11 @@ export default function SeasonPage() {
       return <Badge variant="default" className="bg-green-100 text-green-800">Final</Badge>;
     }
     if (game.status === 'live') {
-      return <Badge variant="default" className="bg-red-100 text-red-800">Live</Badge>;
+      return (
+        <Badge variant="default" className="bg-red-100 text-red-800 animate-pulse">
+          🔴 Live
+        </Badge>
+      );
     }
     return <Badge variant="outline">Scheduled</Badge>;
   };
@@ -305,6 +325,8 @@ export default function SeasonPage() {
             games.map((game) => {
               const gameTime = formatGameTime(game.start_time);
               const isCompleted = game.status === 'completed';
+              const isLive = game.status === 'live';
+              const hasScores = game.home_score !== null && game.away_score !== null;
               const userPicked = hasUserPickedGame(game.id);
 
               return (
@@ -312,7 +334,9 @@ export default function SeasonPage() {
                   key={game.id}
                   className={`cursor-pointer transition-colors hover:bg-gray-50 ${
                     selectedGameForDetails?.id === game.id ? 'ring-2 ring-blue-500' : ''
-                  } ${userPicked ? 'border-green-200 bg-green-50' : ''}`}
+                  } ${userPicked ? 'border-green-200 bg-green-50' : ''} ${
+                    isLive ? 'border-red-200 bg-red-50' : ''
+                  }`}
                   onClick={() => handleGameClick(game)}
                 >
                   <CardContent className="p-3">
@@ -325,12 +349,27 @@ export default function SeasonPage() {
                       {getGameStatusBadge(game)}
                     </div>
 
-                    {isCompleted && game.home_score !== null && game.away_score !== null ? (
+                    {hasScores ? (
                       <div className="text-center">
                         <div className="font-bold text-sm">
                           {game.away_score} - {game.home_score}
                         </div>
-                        <div className="text-xs text-green-600">Final</div>
+                        {isLive ? (
+                          <div className="text-xs">
+                            <div className="text-red-600 font-medium">
+                              {game.display_clock && game.display_clock !== '0:00' ? game.display_clock : 'Live'}
+                            </div>
+                            {game.status_detail && (
+                              <div className="text-gray-600">{game.status_detail}</div>
+                            )}
+                          </div>
+                        ) : isCompleted ? (
+                          <div className="text-xs text-green-600">Final</div>
+                        ) : (
+                          <div className="text-xs text-gray-600">
+                            {game.status_detail || 'Scheduled'}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center">
@@ -420,9 +459,50 @@ export default function SeasonPage() {
                     <div className="text-xl font-semibold">
                       {selectedGameForDetails.away_team.name} @ {selectedGameForDetails.home_team.name}
                     </div>
-                    <div className="text-sm text-gray-600">
-                      {formatGameTime(selectedGameForDetails.start_time).date} at {formatGameTime(selectedGameForDetails.start_time).time}
-                    </div>
+
+                    {/* Live Score Display */}
+                    {selectedGameForDetails.home_score !== null && selectedGameForDetails.away_score !== null ? (
+                      <div className="my-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="grid grid-cols-3 items-center gap-4">
+                          <div className="text-center">
+                            <div className="font-medium text-lg">{selectedGameForDetails.away_team.abbreviation}</div>
+                            <div className="text-2xl font-bold">{selectedGameForDetails.away_score}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm text-gray-500">vs</div>
+                            {selectedGameForDetails.status === 'live' ? (
+                              <div className="space-y-1">
+                                <div className="text-red-600 font-bold">
+                                  {selectedGameForDetails.display_clock && selectedGameForDetails.display_clock !== '0:00'
+                                    ? selectedGameForDetails.display_clock
+                                    : 'LIVE'
+                                  }
+                                </div>
+                                {selectedGameForDetails.status_detail && (
+                                  <div className="text-xs text-gray-600">
+                                    {selectedGameForDetails.status_detail}
+                                  </div>
+                                )}
+                              </div>
+                            ) : selectedGameForDetails.status === 'completed' ? (
+                              <div className="text-green-600 font-medium">FINAL</div>
+                            ) : (
+                              <div className="text-xs text-gray-600">
+                                {selectedGameForDetails.status_detail || 'Scheduled'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-lg">{selectedGameForDetails.home_team.abbreviation}</div>
+                            <div className="text-2xl font-bold">{selectedGameForDetails.home_score}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600 mt-2">
+                        {formatGameTime(selectedGameForDetails.start_time).date} at {formatGameTime(selectedGameForDetails.start_time).time}
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {selectedGameForDetails.odds && selectedGameForDetails.odds.length > 0 ? (

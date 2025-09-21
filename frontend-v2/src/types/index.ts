@@ -19,6 +19,11 @@ export interface Game {
   home_score: number | null;
   away_score: number | null;
   status: string;
+  clock?: number;
+  display_clock?: string;
+  period?: number;
+  status_detail?: string;
+  last_updated?: string;
   home_team: {
     name: string;
     abbreviation: string;
