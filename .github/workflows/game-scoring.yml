@@ -18,6 +18,7 @@ jobs:
 
           response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/scoring/auto" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -o response.json)
 
           http_code=$(echo $response | tail -c 4)
