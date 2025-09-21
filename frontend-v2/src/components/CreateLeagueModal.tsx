@@ -50,14 +50,13 @@ export default function CreateLeagueModal({ open, onOpenChange, onLeagueCreated 
 
     // For now, just use the known sports from the database
     const knownSports = [
-      { id: 1, name: 'American Football' },
-      { id: 2, name: 'Hockey' },
-      { id: 5, name: 'NFL' }
+      { id: 1, name: 'NFL' },
+      { id: 2, name: 'Hockey' }
     ];
 
     setSports(knownSports);
 
-    // Auto-select American Football (id: 1) since that's what we use for football
+    // Auto-select NFL (id: 1) since that's what we primarily use
     setFormData(prev => ({ ...prev, sport_id: '1' }));
 
     setSportsLoading(false);

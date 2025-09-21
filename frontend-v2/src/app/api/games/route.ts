@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getCurrentNFLWeek, isGameInCurrentWeek } from '@/lib/nfl-week';
+import { getCurrentNFLWeek, isGameInCurrentWeek, getNFLWeekDateRange } from '@/lib/nfl-week';
 import { validateId } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         let gamesError;
 
         const sport = Array.isArray(league.sports) ? league.sports[0] : league.sports;
-        if (sport.name === 'American Football' || sport.name === 'NFL') {
+        if (sport.name === 'NFL' || sport.name === 'American Football') {
             // Fetch all NFL games from the global games table
             const { data: nflGames, error: nflGamesError } = await supabaseAdmin
                 .from('games')
@@ -122,10 +122,33 @@ export async function GET(request: NextRequest) {
 
         let filteredGames = games || [];
 
+        // Debug logging
+        console.log('DEBUG - Games API:', {
+            totalGamesFromDB: games?.length || 0,
+            currentWeek,
+            weekParam: week,
+            sportName: sport?.name,
+            firstFewGames: games?.slice(0, 3).map(g => ({
+                id: g.id,
+                week: g.week,
+                start_time: g.start_time,
+                home_team: g.home_team?.abbreviation,
+                away_team: g.away_team?.abbreviation
+            }))
+        });
+
         if (week) {
-            // Filter by specific week - for now, return all games and let frontend handle it
-            // In production, you'd want to add week numbers to games table
-            filteredGames = games || [];
+            // Filter by specific week using date ranges
+            const weekNum = parseInt(week);
+            if (weekNum && !isNaN(weekNum)) {
+                const { start: weekStart, end: weekEnd } = getNFLWeekDateRange(weekNum);
+                filteredGames = games?.filter(game => {
+                    const gameDate = new Date(game.start_time);
+                    return gameDate >= weekStart && gameDate <= weekEnd;
+                }) || [];
+            } else {
+                filteredGames = games || [];
+            }
         } else {
             // Default: show current week games only
             filteredGames = games?.filter(game =>
@@ -133,10 +156,28 @@ export async function GET(request: NextRequest) {
             ) || [];
         }
 
+        console.log('DEBUG - After filtering:', {
+            filteredGamesCount: filteredGames.length,
+            weekFilter: week || 'current week only',
+            dateRange: week ? (() => {
+                const weekNum = parseInt(week);
+                if (weekNum && !isNaN(weekNum)) {
+                    const { start, end } = getNFLWeekDateRange(weekNum);
+                    return { start: start.toISOString(), end: end.toISOString() };
+                }
+                return null;
+            })() : 'current week range'
+        });
+
         return NextResponse.json({
             games: filteredGames,
             currentWeek,
-            totalGames: games?.length || 0
+            totalGames: games?.length || 0,
+            debug: {
+                totalFromDB: games?.length || 0,
+                afterFiltering: filteredGames.length,
+                sportName: sport?.name
+            }
         });
 
     } catch (err) {

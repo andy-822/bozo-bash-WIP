@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
         // Check for existing pick this week in this season
         const { data: existingPick, error: existingError } = await supabaseAdmin
             .from('picks')
-            .select('id, game_id')
+            .select('id, game_id, games!inner(start_time)')
             .eq('user_id', user.id)
             .eq('week', weekNumber)
             .eq('season_id', seasonId)
@@ -221,12 +221,29 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Error checking existing picks' }, { status: 500 });
         }
 
-        // If user already has a pick this week, return error instead of deleting
+        // If user already has a pick this week, check if we can overwrite it
         if (existingPick) {
-            return NextResponse.json({
-                error: `You already have a pick for Week ${weekNumber}. You can only make one pick per week.`,
-                existing_pick: existingPick
-            }, { status: 400 });
+            // Check if the existing pick's game has started
+            const existingGameTime = new Date((existingPick.games as any).start_time);
+            const now = new Date();
+
+            if (now >= existingGameTime) {
+                return NextResponse.json({
+                    error: `Cannot change pick for Week ${weekNumber}. Your previous pick's game has already started.`,
+                    existing_pick: existingPick
+                }, { status: 400 });
+            }
+
+            // Delete the existing pick so we can create a new one
+            const { error: deleteError } = await supabaseAdmin
+                .from('picks')
+                .delete()
+                .eq('id', existingPick.id);
+
+            if (deleteError) {
+                console.error('Error deleting existing pick:', deleteError);
+                return NextResponse.json({ error: 'Failed to update pick' }, { status: 500 });
+            }
         }
 
         // Create the new pick
