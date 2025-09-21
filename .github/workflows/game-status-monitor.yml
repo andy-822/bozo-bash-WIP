@@ -1,0 +1,64 @@
+name: Game Status Monitor
+
+on:
+  schedule:
+    # Every 5 minutes during NFL game days (EST)
+    # Thursday Night Football
+    - cron: '*/5 0-4 * * 5'      # Thursday 8pm-12am EST (Friday 0-4am UTC)
+
+    # Sunday Games (all day coverage)
+    - cron: '*/5 16-23 * * 0'    # Sunday 12pm-7pm EST (16-23 UTC)
+
+    # Sunday Night Football
+    - cron: '*/5 0-4 * * 1'      # Sunday 8pm-12am EST (Monday 0-4am UTC)
+
+    # Monday Night Football
+    - cron: '*/5 0-4 * * 2'      # Monday 8pm-12am EST (Tuesday 0-4am UTC)
+
+    # Extra monitoring on game days (wider window for schedule changes)
+    - cron: '*/15 12-23 * * 0'   # Sunday 8am-7pm EST (12-23 UTC)
+    - cron: '*/15 12-23 * * 1'   # Monday 8am-7pm EST
+    - cron: '*/15 12-23 * * 2'   # Tuesday 8am-7pm EST
+    - cron: '*/15 12-23 * * 5'   # Friday 8am-7pm EST
+
+  workflow_dispatch: {}  # Allow manual trigger
+
+jobs:
+  monitor-game-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Monitor NFL Game Status Changes
+        run: |
+          echo "📊 Monitoring NFL game status changes..."
+
+          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-game-status" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -o response.json)
+
+          http_code=$(echo $response | tail -c 4)
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Game status monitoring completed successfully"
+            cat response.json
+
+            # Check if any status changes occurred
+            status_changes=$(cat response.json | grep -o '"statusChanges":[0-9]*' | cut -d':' -f2)
+            if [ "$status_changes" -gt 0 ]; then
+              echo "🎯 $status_changes game status changes detected!"
+            else
+              echo "📊 No status changes this cycle"
+            fi
+          else
+            echo "❌ Game status monitoring failed with HTTP $http_code"
+            cat response.json
+            exit 1
+          fi
+
+      - name: Upload Response Log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: game-status-monitor-response
+          path: response.json
+          retention-days: 1

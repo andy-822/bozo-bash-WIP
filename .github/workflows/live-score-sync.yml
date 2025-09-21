@@ -1,0 +1,50 @@
+name: Live Score Sync
+
+on:
+  schedule:
+    # Every minute during NFL game windows (EST)
+    # Thursday Night Football
+    - cron: '* 0-4 * * 5'        # Thursday 8pm-12am EST (Friday 12-4am UTC)
+
+    # Sunday Games
+    - cron: '* 17-23 * * 0'      # Sunday 1-7pm EST (17-23 UTC)
+
+    # Sunday Night Football
+    - cron: '* 0-4 * * 1'        # Sunday 8pm-12am EST (Monday 0-4am UTC)
+
+    # Monday Night Football
+    - cron: '* 0-4 * * 2'        # Monday 8pm-12am EST (Tuesday 0-4am UTC)
+
+  workflow_dispatch: {}  # Allow manual trigger
+
+jobs:
+  sync-live-scores:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Live NFL Scores
+        run: |
+          echo "🏈 Syncing live NFL scores..."
+
+          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-live-scores" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -o response.json)
+
+          http_code=$(echo $response | tail -c 4)
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Live score sync completed successfully"
+            cat response.json
+          else
+            echo "❌ Live score sync failed with HTTP $http_code"
+            cat response.json
+            exit 1
+          fi
+
+      - name: Upload Response Log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: live-score-sync-response
+          path: response.json
+          retention-days: 1

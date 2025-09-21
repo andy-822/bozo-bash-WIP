@@ -1,0 +1,54 @@
+name: Test ESPN Sync
+
+on:
+  workflow_dispatch: {}  # Manual trigger only
+
+jobs:
+  test-espn-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Game Status Monitor
+        run: |
+          echo "🧪 Testing Game Status Monitor..."
+
+          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-game-status" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -o status-response.json)
+
+          http_code=$(echo $response | tail -c 4)
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Game Status Monitor - SUCCESS"
+            cat status-response.json
+          else
+            echo "❌ Game Status Monitor - FAILED with HTTP $http_code"
+            cat status-response.json
+          fi
+
+      - name: Test Live Score Sync
+        run: |
+          echo "🧪 Testing Live Score Sync..."
+
+          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-live-scores" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -o scores-response.json)
+
+          http_code=$(echo $response | tail -c 4)
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Live Score Sync - SUCCESS"
+            cat scores-response.json
+          else
+            echo "❌ Live Score Sync - FAILED with HTTP $http_code"
+            cat scores-response.json
+          fi
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: espn-sync-test-results
+          path: "*.json"
+          retention-days: 2
