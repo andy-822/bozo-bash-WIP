@@ -5,6 +5,7 @@ import { useSeasonLeaderboard, useWeeklyLeaderboard } from '@/hooks/useLeaderboa
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, TrendingUp, TrendingDown, Minus, Crown, Medal, Award } from 'lucide-react';
+import Image from 'next/image';
 
 interface LeaderboardProps {
   seasonId: string;
@@ -153,9 +154,11 @@ export default function Leaderboard({ seasonId, currentWeek = 1, showWeeklyToggl
               <div className="col-span-3 flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
                   {entry.avatar_url ? (
-                    <img
+                    <Image
                       src={entry.avatar_url}
                       alt={entry.username}
+                      width={32}
+                      height={32}
                       className="w-8 h-8 rounded-full"
                     />
                   ) : (

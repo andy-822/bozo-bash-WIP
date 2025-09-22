@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
 /**
  * Get migration status and schema information
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     // Check current schema status
     const { data: gamesStructure } = await supabaseAdmin

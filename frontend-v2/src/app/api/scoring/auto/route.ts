@@ -11,8 +11,7 @@ import {
 import {
   ScoringCalculator,
   getLeagueScoringRules,
-  recalculateUserSeasonStats,
-  type Pick as ScoringPick
+  recalculateUserSeasonStats
 } from '@/lib/scoring';
 
 interface DatabaseGame {

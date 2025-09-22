@@ -311,7 +311,7 @@ export async function GET(request: NextRequest) {
         setImmediate(async () => {
           try {
             console.log(`Background revalidation started for ${cacheKey}`);
-            const freshData = await fetchFreshDashboardData(adminLeagues);
+            const freshData = await fetchFreshDashboardData();
             setCachedData(cacheKey, freshData, true);
             console.log(`Background revalidation completed for ${cacheKey}`);
           } catch (error) {
@@ -345,7 +345,7 @@ export async function GET(request: NextRequest) {
     console.log(`ESPN admin dashboard: Cache miss for user ${user.id}, fetching fresh data`);
 
     // Fetch fresh data
-    const freshData = await fetchFreshDashboardData(adminLeagues);
+    const freshData = await fetchFreshDashboardData();
 
     // Update cache statistics
     const queryTime = freshData._metadata.queryTimeMs;
@@ -392,7 +392,7 @@ export async function GET(request: NextRequest) {
 /**
  * Fetch fresh dashboard data (extracted for reuse in background revalidation)
  */
-async function fetchFreshDashboardData(_adminLeagues?: Array<{ id: number; name: string }>): Promise<DashboardData> {
+async function fetchFreshDashboardData(): Promise<DashboardData> {
   const startTime = Date.now();
 
   const [

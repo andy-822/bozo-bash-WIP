@@ -206,7 +206,35 @@ export async function updateTeamInformationFromESPN(espnData: ESPNScoreboardResp
     return;
   }
 
-  const teamUpdates = new Map<string, any>();
+  const teamUpdates = new Map<string, {
+    espn_team_id: string;
+    abbreviation: string;
+    primary_color?: string | null;
+    alternate_color?: string | null;
+    logo_url?: string | null;
+    venue_name?: string | null;
+    venue_id?: string | null;
+    current_record?: string | null;
+    home_record?: string | null;
+    away_record?: string | null;
+    last_updated: string;
+    leaders?: Array<{
+      name: string;
+      leaders?: Array<{
+        athlete: {
+          id: string;
+          fullName: string;
+          position?: {
+            abbreviation: string;
+          };
+          jersey?: string;
+          headshot?: string;
+        };
+        displayValue?: string;
+        value?: number;
+      }>;
+    }>;
+  }>();
 
   // Collect all unique teams from all games
   for (const event of espnData.events) {
@@ -282,7 +310,22 @@ export async function updateTeamInformationFromESPN(espnData: ESPNScoreboardResp
 /**
  * Update team statistical leaders in database
  */
-async function updateTeamStatistics(teamId: number, leaders: any[]): Promise<void> {
+async function updateTeamStatistics(teamId: number, leaders: Array<{
+  name: string;
+  leaders?: Array<{
+    athlete: {
+      id: string;
+      fullName: string;
+      position?: {
+        abbreviation: string;
+      };
+      jersey?: string;
+      headshot?: string;
+    };
+    displayValue?: string;
+    value?: number;
+  }>;
+}>): Promise<void> {
   for (const leader of leaders) {
     if (!leader.leaders || leader.leaders.length === 0) continue;
 

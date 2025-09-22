@@ -5,6 +5,7 @@ import { useWeeklyStandings, getStreakDisplayText, getStreakColorClass, formatPo
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Image from 'next/image';
 import {
   Trophy,
   TrendingUp,
@@ -218,9 +219,11 @@ export default function WeeklyStandings({ seasonId, week, autoRefresh = true }: 
                 <div className="col-span-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                     {standing.avatar_url ? (
-                      <img
+                      <Image
                         src={standing.avatar_url}
                         alt={standing.username}
+                        width={40}
+                        height={40}
                         className="w-10 h-10 rounded-full"
                       />
                     ) : (

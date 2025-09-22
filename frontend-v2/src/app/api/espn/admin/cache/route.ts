@@ -11,7 +11,7 @@ import { getCacheStats, invalidateDashboardCache } from '../dashboard/route';
  * Provides cache monitoring and management capabilities for admins
  */
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     // Authentication check - only league admins can access
     const supabase = await createServerSupabaseClient();
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         });
 
       case 'warm':
-        const warmResult = await warmCache(adminLeagues);
+        const warmResult = await warmCache();
         return NextResponse.json({
           success: true,
           message: 'Cache warming initiated',
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 /**
  * Warm cache by pre-loading data for active admin users
  */
-async function warmCache(_triggerAdminLeagues?: Array<{ id: number; name: string }>): Promise<{ warmedEntries: number; errors: number }> {
+async function warmCache(): Promise<{ warmedEntries: number; errors: number }> {
   console.log('Starting cache warming process...');
 
   let warmedEntries = 0;

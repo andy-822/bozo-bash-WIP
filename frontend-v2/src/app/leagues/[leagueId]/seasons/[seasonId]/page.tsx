@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useRouter, useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
@@ -47,7 +47,6 @@ export default function SeasonPage() {
   const {
     pickModalOpen: showPickModal,
     selectedGame,
-    openPickModal,
     closePickModal,
   } = useModalStore();
 
@@ -66,7 +65,6 @@ export default function SeasonPage() {
   } = useGames(seasonId);
 
   const currentWeek = gamesData?.currentWeek || 1;
-  const totalGames = gamesData?.totalGames || 0;
 
   // Week selector state
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
@@ -83,7 +81,7 @@ export default function SeasonPage() {
     error: weekGamesError,
   } = useGamesForWeek(seasonId, selectedWeek);
 
-  const games: Game[] = weekGamesData?.games || [];
+  const games: Game[] = useMemo(() => weekGamesData?.games || [], [weekGamesData?.games]);
 
   // Auto-refresh for live games
   useEffect(() => {
@@ -103,7 +101,6 @@ export default function SeasonPage() {
 
   // Get user's picks for the selected week
   const {
-    data: userWeekPicksData,
     isLoading: userPicksLoading,
   } = useUserWeekPicks(seasonId, selectedWeek);
 
@@ -113,7 +110,6 @@ export default function SeasonPage() {
     isLoading: leaguePicksLoading,
   } = useLeaguePicks(leagueId, selectedWeek);
 
-  const userWeekPick = userWeekPicksData?.picks?.[0] || null;
   const leaguePicks = leaguePicksData || [];
 
   // Pick creation mutation
@@ -147,9 +143,6 @@ export default function SeasonPage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const handleMakePickClick = (game: Game) => {
-    openPickModal(game);
-  };
 
   const handlePickSubmitted = () => {
     // Refresh games to show updated state
