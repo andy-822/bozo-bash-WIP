@@ -10,8 +10,6 @@ import { Calendar, GamepadIcon, CheckCircle, ChevronLeft, ChevronRight, ArrowLef
 import MakePickModal from '@/components/MakePickModal';
 import LeaguePicksDisplay from '@/components/LeaguePicksDisplay';
 import Leaderboard from '@/components/Leaderboard';
-import { ThemeSelector } from '@/components/ThemeSelector';
-import { initializeTheme } from '@/lib/theme';
 import { useSeason, useGames, useGamesForWeek } from '@/hooks/useGames';
 import { useUserWeekPicks } from '@/hooks/useUserWeekPicks';
 import { useLeaguePicks, useCreatePick } from '@/hooks/usePicks';
@@ -30,10 +28,6 @@ export default function SeasonPage() {
   const leagueId = params.leagueId as string;
   const seasonId = params.seasonId as string;
 
-  // Initialize theme on component mount
-  useEffect(() => {
-    initializeTheme();
-  }, []);
 
   // UI State
   const [viewState, setViewState] = useState<ViewState>('overview');
@@ -440,7 +434,6 @@ export default function SeasonPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <ThemeSelector />
               {viewState === 'game-details' && (
                 <Button variant="outline" onClick={handleBackToOverview}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
