@@ -1,0 +1,27 @@
+name: Sync Player Props
+
+on:
+  schedule:
+    # Run every 4 hours during NFL season (Sept-Feb)
+    - cron: '0 */4 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync-player-props:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync Player Props
+        run: |
+          curl -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXTAUTH_URL }}/api/cron/sync-player-props"
+
+      - name: Check sync status
+        if: failure()
+        run: |
+          echo "Player props sync failed. Check the application logs."
+          exit 1

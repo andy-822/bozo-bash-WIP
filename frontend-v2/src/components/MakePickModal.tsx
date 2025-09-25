@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCreatePick } from '@/hooks/usePicks';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import PlayerPropsList from '@/components/PlayerPropsList';
 
 interface Game {
   id: number;
@@ -43,8 +45,21 @@ interface MakePickModalProps {
   onPickSubmitted?: () => void;
 }
 
-type BetType = 'moneyline' | 'spread' | 'total';
+type BetType = 'moneyline' | 'spread' | 'total' | 'player_prop';
 type Selection = string;
+
+interface PlayerProp {
+  id: number;
+  athlete_id: string;
+  athlete_name: string;
+  market_key: string;
+  description: string;
+  sportsbook: string;
+  over_price?: number;
+  under_price?: number;
+  point?: number;
+  last_update: string;
+}
 
 export default function MakePickModal({
   open,
@@ -56,6 +71,10 @@ export default function MakePickModal({
 }: MakePickModalProps) {
   const [selectedBetType, setSelectedBetType] = useState<BetType | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Selection | null>(null);
+  const [selectedPlayerProp, setSelectedPlayerProp] = useState<{
+    prop: PlayerProp;
+    selection: 'over' | 'under';
+  } | null>(null);
 
   const createPickMutation = useCreatePick();
   const { toast } = useToast();
@@ -73,19 +92,30 @@ export default function MakePickModal({
     onOpenChange(false);
     setSelectedBetType(null);
     setSelectedTeam(null);
+    setSelectedPlayerProp(null);
   };
 
   const handleSubmit = async () => {
-    if (!selectedBetType || !selectedTeam) return;
+    if (!selectedBetType) return;
+    if (selectedBetType !== 'player_prop' && !selectedTeam) return;
+    if (selectedBetType === 'player_prop' && !selectedPlayerProp) return;
 
     try {
-      await createPickMutation.mutateAsync({
+      const pickData: any = {
         game_id: game.id,
         bet_type: selectedBetType,
-        selection: selectedTeam,
         week: currentWeek,
         season_id: seasonId,
-      });
+      };
+
+      if (selectedBetType === 'player_prop' && selectedPlayerProp) {
+        pickData.selection = `${selectedPlayerProp.prop.athlete_name} ${selectedPlayerProp.prop.market_key} ${selectedPlayerProp.selection} ${selectedPlayerProp.prop.point || ''}`;
+        pickData.player_prop_id = selectedPlayerProp.prop.id;
+      } else {
+        pickData.selection = selectedTeam;
+      }
+
+      await createPickMutation.mutateAsync(pickData);
 
       handleClose();
       onPickSubmitted?.();
@@ -172,7 +202,13 @@ export default function MakePickModal({
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <Tabs defaultValue="game-lines" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="game-lines">Game Lines</TabsTrigger>
+              <TabsTrigger value="player-props">Player Props</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="game-lines" className="space-y-6">
             {/* Moneyline */}
             {(odds.moneyline_home || odds.moneyline_away) && (
               <div className="space-y-3">
@@ -288,7 +324,7 @@ export default function MakePickModal({
               </div>
             )}
 
-            {selectedBetType && selectedTeam && (
+            {selectedBetType && selectedTeam && selectedBetType !== 'player_prop' && (
               <div className="p-4 bg-blue-50 rounded-lg">
                 <h4 className="font-medium text-blue-900">Your Pick:</h4>
                 <p className="text-blue-800">
@@ -301,7 +337,41 @@ export default function MakePickModal({
                 </p>
               </div>
             )}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="player-props" className="space-y-6">
+              <PlayerPropsList
+                gameId={game.id}
+                onSelectProp={(prop, selection) => {
+                  setSelectedBetType('player_prop');
+                  setSelectedTeam(null);
+                  setSelectedPlayerProp({ prop, selection });
+                }}
+              />
+
+              {selectedBetType === 'player_prop' && selectedPlayerProp && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900">Your Pick:</h4>
+                  <p className="text-blue-800">
+                    {selectedPlayerProp.prop.athlete_name} -
+                    {selectedPlayerProp.prop.market_key.replace('player_', '').replace('_', ' ').toUpperCase()}
+                  </p>
+                  <p className="text-blue-700">
+                    {selectedPlayerProp.selection.toUpperCase()} {selectedPlayerProp.prop.point || ''}
+                    {selectedPlayerProp.selection === 'over' && selectedPlayerProp.prop.over_price &&
+                      ` (${selectedPlayerProp.prop.over_price > 0 ? '+' : ''}${selectedPlayerProp.prop.over_price})`
+                    }
+                    {selectedPlayerProp.selection === 'under' && selectedPlayerProp.prop.under_price &&
+                      ` (${selectedPlayerProp.prop.under_price > 0 ? '+' : ''}${selectedPlayerProp.prop.under_price})`
+                    }
+                  </p>
+                  <p className="text-sm text-blue-600 mt-1">
+                    This will replace any previous pick for Week {currentWeek}
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
 
         <DialogFooter>
@@ -311,7 +381,7 @@ export default function MakePickModal({
           {!isPastDeadline && (
             <Button
               onClick={handleSubmit}
-              disabled={!selectedBetType || !selectedTeam || createPickMutation.isPending}
+              disabled={(!selectedBetType || (!selectedTeam && !selectedPlayerProp)) || createPickMutation.isPending}
             >
               {createPickMutation.isPending ? 'Submitting...' : 'Submit Pick'}
             </Button>

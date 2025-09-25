@@ -21,6 +21,7 @@ export interface CreatePickData {
   selection: string;
   week: number;
   season_id: string;
+  player_prop_id?: number;
 }
 
 export interface LeaguePick {
