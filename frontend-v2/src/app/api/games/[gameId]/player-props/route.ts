@@ -1,12 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+interface PlayerPropFromDB {
+  id: number;
+  athlete_id: string;
+  athlete_name: string;
+  team_id: number;
+  sportsbook: string;
+  market_key: string;
+  description: string;
+  over_price?: number;
+  under_price?: number;
+  point?: number;
+  last_update: string;
+  teams: { name: string; abbreviation: string } | null;
+}
+
+interface GroupedProp extends Omit<PlayerPropFromDB, 'sportsbook' | 'over_price' | 'under_price' | 'last_update'> {
+  sportsbooks: Array<{
+    sportsbook: string;
+    over_price?: number;
+    under_price?: number;
+    last_update: string;
+  }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
-    const gameId = parseInt(params.gameId);
+    const { gameId: gameIdParam } = await params;
+    const gameId = parseInt(gameIdParam);
 
     if (isNaN(gameId)) {
       return NextResponse.json({
@@ -48,7 +73,7 @@ export async function GET(
     }
 
     // Group props by player and market for better organization
-    const groupedProps = props?.reduce((acc, prop) => {
+    const groupedProps = (props as unknown as PlayerPropFromDB[])?.reduce((acc, prop) => {
       const key = `${prop.athlete_id}-${prop.market_key}`;
       if (!acc[key]) {
         acc[key] = {
@@ -63,7 +88,7 @@ export async function GET(
         last_update: prop.last_update
       });
       return acc;
-    }, {} as any);
+    }, {} as Record<string, GroupedProp>);
 
     return NextResponse.json({
       success: true,

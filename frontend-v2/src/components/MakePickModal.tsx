@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCreatePick } from '@/hooks/usePicks';
+import { useCreatePick, CreatePickData } from '@/hooks/usePicks';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -101,18 +101,25 @@ export default function MakePickModal({
     if (selectedBetType === 'player_prop' && !selectedPlayerProp) return;
 
     try {
-      const pickData: any = {
-        game_id: game.id,
-        bet_type: selectedBetType,
-        week: currentWeek,
-        season_id: seasonId,
-      };
+      let pickData: CreatePickData;
 
       if (selectedBetType === 'player_prop' && selectedPlayerProp) {
-        pickData.selection = `${selectedPlayerProp.prop.athlete_name} ${selectedPlayerProp.prop.market_key} ${selectedPlayerProp.selection} ${selectedPlayerProp.prop.point || ''}`;
-        pickData.player_prop_id = selectedPlayerProp.prop.id;
+        pickData = {
+          game_id: game.id,
+          bet_type: selectedBetType,
+          week: currentWeek,
+          season_id: seasonId,
+          selection: `${selectedPlayerProp.prop.athlete_name} ${selectedPlayerProp.prop.market_key} ${selectedPlayerProp.selection} ${selectedPlayerProp.prop.point || ''}`,
+          player_prop_id: selectedPlayerProp.prop.id
+        };
       } else {
-        pickData.selection = selectedTeam;
+        pickData = {
+          game_id: game.id,
+          bet_type: selectedBetType,
+          week: currentWeek,
+          season_id: seasonId,
+          selection: selectedTeam || ''
+        };
       }
 
       await createPickMutation.mutateAsync(pickData);
