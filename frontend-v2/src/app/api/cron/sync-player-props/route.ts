@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      : 'https://bozo-bash.vercel.app';
 
     const response = await fetch(`${baseUrl}/api/sync-player-props`, {
       method: 'POST',
