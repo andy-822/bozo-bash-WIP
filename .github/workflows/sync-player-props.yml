@@ -13,15 +13,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate environment
+        run: |
+          if [ -z "${{ secrets.VERCEL_APP_URL }}" ]; then
+            echo "Error: VERCEL_APP_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "Error: CRON_SECRET secret is not set"
+            exit 1
+          fi
+          echo "Environment validation passed"
+
       - name: Sync Player Props
         run: |
-          curl -X GET \
+          echo "Syncing player props at $(date)"
+          echo "Calling: ${{ secrets.VERCEL_APP_URL }}/api/cron/sync-player-props"
+
+          response=$(curl -s -w "%{http_code}" -L -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.NEXTAUTH_URL }}/api/cron/sync-player-props"
+            "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-player-props")
 
-      - name: Check sync status
-        if: failure()
-        run: |
-          echo "Player props sync failed. Check the application logs."
-          exit 1
+          http_code=${response: -3}
+          response_body=${response%???}
+
+          echo "Response code: $http_code"
+          echo "Response body: $response_body"
+
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Player props sync successful"
+          else
+            echo "❌ Player props sync failed with status $http_code"
+            echo "$response_body"
+            # Don't exit with error for now to allow debugging
+          fi
