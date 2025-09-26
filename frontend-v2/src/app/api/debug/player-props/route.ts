@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const PLAYER_PROP_MARKETS = [
@@ -48,7 +48,7 @@ async function fetchPlayerPropsForGame(gameId: string): Promise<OddsApiPlayerPro
   return await response.json();
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = supabaseAdmin;
 
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get team stats for this game
-    const game = mappings.games;
+    const game = mappings.games as unknown as { home_team_id: number; away_team_id: number; id: number };
     const { data: homeTeamStats } = await supabase
       .from('team_stats')
       .select('athlete_id, athlete_name, athlete_position')
