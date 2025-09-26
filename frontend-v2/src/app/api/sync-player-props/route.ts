@@ -232,7 +232,8 @@ export async function POST(request: NextRequest) {
             }
 
             for (const outcome of market.outcomes) {
-              const playerName = outcome.name;
+              // Player names are in the description field, not name field
+              const playerName = outcome.description || outcome.name;
               if (!playerName ||
                   playerName === 'Over' ||
                   playerName === 'Under' ||
