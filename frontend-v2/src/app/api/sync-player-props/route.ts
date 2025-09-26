@@ -233,7 +233,12 @@ export async function POST(request: NextRequest) {
 
             for (const outcome of market.outcomes) {
               const playerName = outcome.name;
-              if (!playerName || playerName === 'Over' || playerName === 'Under') {
+              if (!playerName ||
+                  playerName === 'Over' ||
+                  playerName === 'Under' ||
+                  playerName === 'Yes' ||
+                  playerName === 'No' ||
+                  playerName.length < 3) {
                 continue;
               }
 
